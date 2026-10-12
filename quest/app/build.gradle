@@ -3,7 +3,7 @@ plugins {
 }
 
 // The city's photos and sky come from quest/tools/fetch_assets.py, not from git.
-def cityAssets = file('src/main/assets/city/sky.hdr')
+def cityAssets = file('src/main/assets/city/sky_night.hdr')
 tasks.register('checkCityAssets') {
     doLast {
         if (!cityAssets.exists())

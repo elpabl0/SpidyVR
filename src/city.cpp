@@ -9,14 +9,16 @@
 namespace spidy::city {
 namespace {
 // metres per tile across and up (plain surfaces); floors and bays per tile (facades).
-constexpr MaterialInfo materials[materialCount] = {
-    {"Facade018A", 0, 0, 6, 6},         {"Facade019A", 0, 0, 6, 6},      {"Facade020A", 0, 0, 6, 6},
-    {"Facade006", 0, 0, 8, 14},         {"Facade001", 0, 0, 10, 16},     {"Facade005", 0, 0, 24, 32},
-    {"Facade017", 0, 0, 12, 12},        {"Bricks085", 2.4f, 1.2f, 0, 0}, {"Bricks101", 2, 2, 0, 0},
-    {"Bricks094", 1.8f, .9f, 0, 0},     {"Bricks066", 2.4f, 2.4f, 0, 0}, {"Concrete046", 2.4f, 2.4f, 0, 0},
-    {"Asphalt020L", 4.6f, 4.6f, 0, 0},  {"PavingStones136", 5, 5, 0, 0}, {"Gravel028", 6, 6, 0, 0},
-    {"CorrugatedSteel009", 2, 1, 0, 0}, {"WoodSiding008", 2, 2, 0, 0},
+constexpr MaterialInfo materials[] = {
+    {"Facade018A", 0, 0, 6, 6},         {"Facade019A", 0, 0, 6, 6},       {"Facade020A", 0, 0, 6, 6},
+    {"Facade006", 0, 0, 8, 14},         {"Facade001", 0, 0, 10, 16},      {"Facade005", 0, 0, 24, 32},
+    {"Facade017", 0, 0, 12, 12},        {"Bricks085", 2.4f, 1.2f, 0, 0},  {"Bricks101", 2, 2, 0, 0},
+    {"Bricks094", 1.8f, .9f, 0, 0},     {"Bricks066", 2.4f, 2.4f, 0, 0},  {"Concrete046", 2.4f, 2.4f, 0, 0},
+    {"Asphalt020L", 4.6f, 4.6f, 0, 0},  {"PavingStones136", 5, 5, 0, 0},  {"Gravel028", 6, 6, 0, 0},
+    {"CorrugatedSteel009", 2, 1, 0, 0}, {"WoodSiding008", 2, 2, 0, 0},    {"Bricks086", 2.6f, 1.3f, 0, 0},
+    {"Concrete040", 1.4f, 1.4f, 0, 0},  {"Asphalt033", 2.5f, 2.5f, 0, 0},
 };
+static_assert(std::size(materials) == materialCount, "a material without its photos");
 // splitmix64: the same numbers on every compiler.
 struct Random {
     std::uint64_t state;
@@ -48,7 +50,7 @@ struct Tier {
 };
 struct Building {
     Kind kind{};
-    Material wall{}, trim{};
+    Material wall{}, trim{}, roof = Material::RoofGravel;
     float ground{}, base{}; // sidewalk top, and the top of the ground floor (storefront or not)
     float floorHeight{}, bayWidth{};
     bool storefront{}, cornice{}, parapet{};
@@ -482,8 +484,10 @@ void Generator::building(Building& b, Random& random, bool launch) {
         b.cornice = true;
         break;
     }
-    case Kind::Warehouse:
-        b.wall = random.chance(.6f) ? Material::DarkBrick : Material::RedBrick;
+    case Kind::Warehouse: {
+        const Material walls[] = {Material::DarkBrick, Material::DarkBrick, Material::RedBrick,
+                                  Material::OrangeBrick};
+        b.wall = random.pick(walls);
         b.trim = Material::Concrete;
         b.floorHeight = 4.3f;
         b.bayWidth = 4.4f;
@@ -493,9 +497,11 @@ void Generator::building(Building& b, Random& random, bool launch) {
         storefronts = .2f;
         b.parapet = true;
         break;
+    }
     case Kind::Prewar: {
         const Material walls[] = {Material::BrickWindows, Material::BrickPiers, Material::RedBrick,
-                                  Material::CleanBrick,   Material::Limestone,  Material::BrickWindows};
+                                  Material::CleanBrick,   Material::Limestone,  Material::BrickWindows,
+                                  Material::OrangeBrick,  Material::Stucco};
         b.wall = random.pick(walls);
         b.trim = Material::Limestone;
         b.floorHeight = 3.2f;
@@ -551,6 +557,8 @@ void Generator::building(Building& b, Random& random, bool launch) {
         b.cornice = b.parapet = true;
     }
     b.storefront = random.chance(storefronts);
+    if (random.chance(.35f))
+        b.roof = Material::TarRoof;
     b.base = b.ground + (b.storefront ? 4.6f : b.floorHeight);
     if (facade(b.wall))
         b.bayOffset = random.between(0, info(b.wall).bays - 1);
@@ -581,7 +589,7 @@ void Generator::building(Building& b, Random& random, bool launch) {
     float y0 = b.ground;
     for (const auto& t : b.tiers) {
         walls(b, t.x0, t.z0, t.x1, t.z1, y0, t.top, tint);
-        surface(Material::RoofGravel, {t.x0, t.top, t.z1}, {t.x1 - t.x0, 0, 0}, {0, 0, t.z0 - t.z1}, t.top,
+        surface(b.roof, {t.x0, t.top, t.z1}, {t.x1 - t.x0, 0, 0}, {0, 0, t.z0 - t.z1}, t.top,
                 shade(neutral, random.range(.62f, .85f)));
         if (b.cornice) {
             // A ledge round the roof's edge, standing proud of the walls.
@@ -766,6 +774,7 @@ void Generator::lamp(Vec3 foot, Vec3 out) {
         Vec3{std::max(a.x, tip.x) + .05f, a.y + .1f, std::max(a.z, tip.z) + .05f}, pole, 0x1f);
     const Vec3 lo = tip + Vec3{-.32f, -.18f, -.32f}, hi = tip + Vec3{.32f, .08f, .32f};
     box(Material::Concrete, lo, hi, pole, 0x1f);
+    city_.mesh_.lamps.push_back((lo + hi) * .5f - Vec3{0, .15f, 0});
     surface(Material::Concrete, lo - Vec3{0, .01f, 0}, {hi.x - lo.x, 0, 0}, {0, 0, hi.z - lo.z}, -1000,
             {255, 226, 170, 0}, {static_cast<std::uint8_t>(Surface::Lamp), 0, 0, 0});
 }
@@ -782,7 +791,7 @@ void Generator::trafficLight(Vec3 foot, Vec3 out, bool green) {
         const Tint colour = !lit ? Tint{30, 30, 28, 0} : green ? Tint{90, 255, 150, 0} : Tint{255, 50, 30, 0};
         const Vec3 centre = foot + Vec3{0, lights[k], 0} + out * .235f;
         surface(Material::Concrete, centre - across * .13f - up * .13f, across * .26f, up * .26f, -1000,
-                colour, {static_cast<std::uint8_t>(lit ? Surface::Lamp : Surface::Plain), 0, 0, 0});
+                colour, {static_cast<std::uint8_t>(lit ? Surface::Signal : Surface::Plain), 0, 0, 0});
     }
 }
 

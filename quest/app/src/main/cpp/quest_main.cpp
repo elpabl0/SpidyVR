@@ -88,7 +88,7 @@ void run(android_app* app, AppState& state) {
     WebGrab grab;
     Rig rig;
     std::vector<Vertex> geometry;
-    bool snapHeld = false, resetHeld = false, haveHead = false;
+    bool snapHeld = false, resetHeld = false, timeHeld = false, haveHead = false;
     Pose lastHead{};
     unsigned knockdowns = 0;
     int64_t pulseUntil[2]{};
@@ -103,7 +103,8 @@ void run(android_app* app, AppState& state) {
     };
     reset();
     quest::log(
-        "Squeeze a grip: web and swing. Trigger: reel. Pull sharply: zip. A: jump. Y: back to the roof.");
+        "Squeeze a grip: web and swing. Trigger: reel. Pull sharply: zip. A: jump. Y: back to the roof. "
+        "X: day, sunset, night.");
     while (!app->destroyRequested) {
         // Android's events: wait for them while no frames run (paused, or
         // the runtime not ready yet); between frames, only take what is there.
@@ -130,6 +131,16 @@ void run(android_app* app, AppState& state) {
                 if (f.focused && f.valid && f.reset && !resetHeld)
                     reset();
                 resetHeld = f.reset;
+                // X: day, sunset, night.
+                const bool timeButton = (f.buttons & buttonX) != 0;
+                if (f.focused && timeButton && !timeHeld) {
+                    const auto next =
+                        static_cast<city::TimeOfDay>((static_cast<int>(renderer.timeOfDay()) + 1) % 3);
+                    renderer.timeOfDay(next);
+                    const char* names[] = {"day", "sunset", "night"};
+                    quest::log(std::string("Time of day: ") + names[static_cast<int>(next)]);
+                }
+                timeHeld = timeButton;
                 const float turn = f.hands[1].stickX;
                 if (f.focused && f.valid && std::abs(turn) > .7f && !snapHeld) {
                     rig.turn(turn > 0 ? -.5235988f : .5235988f, f.head.position);
@@ -206,6 +217,8 @@ void run(android_app* app, AppState& state) {
                     }
                 }
                 renderer.shadows(viewer);
+                // The city in glass and water: one face of the reflection a frame.
+                renderer.reflections(viewer);
             },
             [&](unsigned, const Pose& eye, const EyeFov& fov, unsigned width, unsigned height) {
                 const Pose world = rig.toWorld(eye);

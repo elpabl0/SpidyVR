@@ -144,15 +144,54 @@
         "Roughness": "04ea168420ff533b7be6cb69d13a3c2bb350472c75e6a555e7623cf2e38be30b",
         "Metalness": "646e926af1ecd430908da936dc919c0f1b21c6f7ed566fd781e3f6d8737e9991"
       }
+    },
+    {
+      "id": "Bricks086",
+      "files": {
+        "Color": "49fd67eb1aaee3ab524a11222a4f1ce3c99311363a27a8b2b9136bc8cc4df285",
+        "NormalGL": "aaa61bceee8b8414edd76b679ff6cf80ccfc8604339189aa93f71c2c11fc0a27",
+        "Roughness": "80ab8dd0a7e42e18f17dd93a07ec16ef13f0a71eaa04706608d75e353c88fe9b"
+      }
+    },
+    {
+      "id": "Concrete040",
+      "files": {
+        "Color": "b5182fecece657e87ad94c6489603ee81bf32efbf6b75693ee6b16a7ca492493",
+        "NormalGL": "2ce7ef47933975f2d6ed4910044962244b3e372fbcfaa50a57210d38e028e318",
+        "Roughness": "fc7a69b75de9192ab5361a8db4ebd73c41285448cb7a6587b754d691ed50f1a1"
+      }
+    },
+    {
+      "id": "Asphalt033",
+      "files": {
+        "Color": "126edfd31019dcc0e108ce6966eb0c23f772f130a3abcc3be6daedc590cbb7f8",
+        "NormalGL": "34bf3e95a41a3856c291d2cb039dc75e5a72cc9499343248c6c7e9c1a91a9336",
+        "Roughness": "ab1dee12de196e7f1462fd01ebb629e0ae68af9de08c26d38abd2d11dfe2022a"
+      }
     }
   ],
-  "sky": {
-    "id": "kloofendal_48d_partly_cloudy_puresky",
-    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
-    "sha256": "5244534e9cf5b606f2ff513aa00ddb161b0a4826ffd88a0d3bd03ac29247d198"
-  },
   "stb_image": {
     "revision": "2c980bb59875b0d32144a71867fbdebb2f77cd20",
     "sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3"
-  }
+  },
+  "skies": [
+    {
+      "file": "sky_day.hdr",
+      "id": "kloofendal_48d_partly_cloudy_puresky",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+      "sha256": "5244534e9cf5b606f2ff513aa00ddb161b0a4826ffd88a0d3bd03ac29247d198"
+    },
+    {
+      "file": "sky_sunset.hdr",
+      "id": "kloppenheim_06_puresky",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_06_puresky_2k.hdr",
+      "sha256": "99451201586489ef3288c97bfac2a2ac232a5491c51a1faf0ec8ea39f3ccd533"
+    },
+    {
+      "file": "sky_night.hdr",
+      "id": "kloppenheim_02_puresky",
+      "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloppenheim_02_puresky_2k.hdr",
+      "sha256": "e06091a38c4c778b06123ba13dca8f2c91a21c13c14eec91048c5003815d21b8"
+    }
+  ]
 }

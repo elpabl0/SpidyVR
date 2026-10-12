@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <limits>
 #include <stb_image.h>
 #include <stdexcept>
 
@@ -48,18 +49,24 @@ void main() {
     "const float PI = 3.14159265;\n"                                                                         \
     "vec2 skyUv(vec3 d) { return vec2(0.5 + atan(d.x, -d.z) / (2.0 * PI), acos(clamp(d.y, -1.0, 1.0)) / "    \
     "PI); }\n"                                                                                               \
-    "vec3 sky(vec3 d, float lod) { return textureLod(uSky, skyUv(d), max(lod, 0.0)).rgb; }\n"                \
+    "vec3 sky(vec3 d, float lod) { return textureLod(uSky, skyUv(d), max(lod, 0.0)).rgb * uSkyScale; }\n"    \
     "vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); " \
     "}\n"
 constexpr const char* cityFragment = R"(#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
-uniform sampler2D uAlbedo;
-uniform sampler2D uSurface;
-uniform sampler2D uSky;
+uniform sampler2D uAlbedo, uSurface, uSky, uLamps;
 uniform sampler2DShadow uShadowMap;
+uniform samplerCube uProbe;
 uniform vec3 uEye, uSun, uSunColor;
-uniform float uSkyLevels, uExposure, uTime, uFogDensity;
+uniform float uSkyLevels, uSkyScale, uExposure, uTime, uFogDensity;
+uniform float uLight;       // artificial light's brightness, scene units
+uniform float uLampLevel;   // street lamps: 0 off (day) to 1 (night)
+uniform float uWindowsLit;  // the share of rooms with their lights on
+uniform float uFacade;      // 1: a facade photo with its own windows
+uniform float uProbeLevels; // the reflection probe's levels; 0: none
+uniform int uCapture;       // 1: drawing into the probe, linear, sky reflections only
+uniform vec4 uLampArea;     // the lamp light map: origin and size on the ground (xz)
 in vec3 vPosition;
 in vec3 vNormal;
 in vec4 vUv;
@@ -73,6 +80,12 @@ float hash(vec2 p) {
     p = fract(p * vec2(123.34, 456.21));
     p += dot(p, p + 45.32);
     return fract(p.x * p.y);
+}
+float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0)), f.x),
+               f.y);
 }
 vec3 toLinear(vec3 c) { return pow(c, vec3(2.2)); }
 float sunShadow() {
@@ -103,6 +116,27 @@ float hazeAt(vec3 p) {
     float mean = abs(dy) < 0.5 ? exp(-y0 / scale) : (exp(-y0 / scale) - exp(-y1 / scale)) / (dy / scale);
     return 1.0 - exp(-length(p - uEye) * uFogDensity * mean);
 }
+// What a mirror at this point sees along r: the city round the viewer (the
+// probe), or, without it, the sky above and the streets' grey below.
+vec3 reflection(vec3 r, float rough) {
+    if (uProbeLevels > 0.0 && uCapture == 0)
+        return textureLod(uProbe, r, rough * (uProbeLevels - 3.0)).rgb;
+    float skyline = mix(0.45, 0.0, smoothstep(5.0, 140.0, vPosition.y));
+    vec3 street = sky(normalize(vec3(r.x, 0.05, r.z)), uSkyLevels - 3.0) * 0.16;
+    return mix(street, sky(r, rough * (uSkyLevels - 3.0)), smoothstep(skyline - 0.15, skyline + 0.12, r.y));
+}
+// Whether a room's lights are on: in runs along a floor (a lit office,
+// a family's flat), a few on their own.
+float lightsOn(vec2 cell, float seed) {
+    float run = hash(vec2(floor(cell.x / 4.0), cell.y) + seed * 0.37);
+    float one = hash(cell + seed * 0.61);
+    return step(mix(run, one, 0.3), uWindowsLit);
+}
+// A room's light: warm lamps or cool office tubes.
+vec3 roomLight(vec2 cell, float r) {
+    vec3 warm = vec3(1.0, 0.72, 0.42), cool = vec3(0.82, 0.9, 1.0);
+    return mix(warm, cool, step(0.6, hash(cell * 1.7 + r))) * uLight * mix(0.05, 0.16, fract(r * 7.13));
+}
 void main() {
     int kind = int(vStyle.x + 0.5);
     vec3 n = normalize(vNormal);
@@ -112,19 +146,40 @@ void main() {
     float rough = surface.z, metal = surface.w;
     vec3 t = abs(n.y) > 0.9 ? vec3(1.0, 0.0, 0.0) : normalize(cross(vec3(0.0, 1.0, 0.0), n));
     vec3 b = cross(n, t);
-    // Relief fades with distance: far bumps only sparkle.
-    // Grounds and roofs read flatter: their grit sparkles otherwise.
-    vec2 bump = (surface.xy * 2.0 - 1.0) * (1.0 - smoothstep(15.0, 90.0, length(vPosition - uEye)) * 0.85) *
-                mix(1.0, 0.45, step(0.9, n.y));
+    // Relief fades with distance (far bumps only sparkle); grounds and roofs read flatter.
+    float dist = length(vPosition - uEye);
+    vec2 bump = (surface.xy * 2.0 - 1.0) * (1.0 - smoothstep(15.0, 90.0, dist) * 0.85) * mix(1.0, 0.45, step(0.9, n.y));
     vec3 N = normalize(t * bump.x + b * bump.y + n * sqrt(max(1.0 - dot(bump, bump), 0.0)));
     vec3 tint = vTint.rgb * (255.0 / 128.0);
     // Per face, exact: the hashes below turn the least difference into another window.
     float seed = floor(vTint.a * 255.0 + 0.5);
+    float wallness = 1.0 - abs(n.y);
     vec3 emission = vec3(0.0), room = vec3(0.0);
     float glass = 0.0;
-    if (kind == 1) {
-        // A window in each bay of each floor, a room behind each.
+    // Light through a window into an unlit room: the sky's, dimmed.
+    vec3 daylight = sky(vec3(n.x, 0.3, n.z), uSkyLevels - 2.0) * 0.1;
+    if (kind <= 2) {
         albedo *= tint;
+        // Weathering: rain streaks down the walls, dirt at their feet, stains on roofs.
+        if (wallness > 0.5) {
+            float along = dot(vPosition, t);
+            float streak = noise(vec2(along * 1.4, vPosition.y * 0.05 + seed)) * noise(vec2(along * 0.21, vPosition.y * 0.015));
+            float foot = vContact > -500.0 ? 1.0 - smoothstep(0.0, 2.4, vPosition.y - vContact) : 0.0;
+            albedo *= 1.0 - (streak * 0.45 + foot * 0.28);
+        } else if (n.y > 0.9 && vPosition.y > 1.0) {
+            albedo *= 1.0 - noise(vPosition.xz * 0.18 + seed) * noise(vPosition.xz * 0.05) * 0.5;
+        }
+    }
+    if (kind == 0 && uFacade > 0.5) {
+        // The photo's own windows: glass is where it is smooth; some rooms lit.
+        float pane = 1.0 - smoothstep(0.06, 0.15, rough);
+        vec2 cell = floor(vUv.zw), inside = fract(vUv.zw);
+        float r = hash(vec2(floor(cell.x / 4.0), cell.y) + seed);
+        // Ceiling lights: brighter at the top of each floor.
+        float ceiling = mix(0.35, 1.0, smoothstep(0.25, 0.85, inside.y));
+        emission += pane * lightsOn(cell, seed) * roomLight(cell, r) * ceiling;
+    } else if (kind == 1) {
+        // A window in each bay of each floor, a room behind each.
         vec2 cell = vUv.zw, c = fract(cell), id = floor(cell), fw = fwidth(cell);
         float w = vStyle.y / 255.0, h = vStyle.z / 255.0, sill = (1.0 - h) * 0.42;
         vec2 lo = vec2(0.5 - 0.5 * w, sill), hi = vec2(0.5 + 0.5 * w, sill + h);
@@ -141,13 +196,13 @@ void main() {
         rough = mix(rough, 0.45, opening);
         metal = mix(metal, 0.0, opening);
         glass = pane * (1.0 - max(mullion, transom));
-        room = r < 0.08 ? vec3(1.0, 0.72, 0.42) * 0.5 : r < 0.4 ? vec3(0.62, 0.57, 0.48) * 0.16 : vec3(0.025, 0.028, 0.032);
+        room = lightsOn(id, seed) > 0.5 ? roomLight(id, r) * mix(0.5, 1.0, smoothstep(sill, sill + h, c.y))
+                                         : daylight * mix(0.4, 1.6, fract(r * 11.0));
         // Blinds part way down some.
         float blind = step(0.55, r) * step(r, 0.75) * step(sill + h * (1.0 - fract(r * 13.0) * 0.6), c.y);
-        room = mix(room, vec3(0.5, 0.47, 0.4) * 0.35, blind);
+        room = mix(room, max(daylight * 3.0, room * 0.6), blind);
     } else if (kind == 2) {
         // Shop windows between piers, a sign band above.
-        albedo *= tint;
         vec2 cell = vUv.zw, c = vec2(fract(cell.x), cell.y), fw = fwidth(cell);
         float r = hash(vec2(floor(cell.x), seed));
         float pier = 1.0 - rect(c, vec2(0.05, -1.0), vec2(0.95, 2.0), fw);
@@ -166,15 +221,16 @@ void main() {
         rough = mix(rough, 0.35, max(signArea, frameArea));
         metal = mix(metal, 0.0, max(signArea, frameArea));
         glass = glassArea * (1.0 - pier);
-        // The shop inside: a lit ceiling fading down, shelves of goods, the
-        // floor in shade; or a dark empty unit.
+        // The shop inside: a lit ceiling fading down, shelves of goods; or a dark empty unit.
         float shelf = step(0.82, fract(c.y * 5.0 + 0.3)) * step(0.15, c.y);
         float goods = step(0.45, hash(floor(vec2(c.x * 14.0, c.y * 5.0 + 0.3)) + r)) * (1.0 - shelf) *
                       step(0.15, c.y) * step(c.y, 0.62);
         vec3 stock = mix(vec3(0.5, 0.2, 0.1), vec3(0.15, 0.3, 0.5), hash(floor(vec2(c.x * 14.0, c.y * 5.0)) + 7.0));
-        vec3 lit = vec3(0.95, 0.8, 0.6) * mix(0.03, 0.16, smoothstep(0.1, 0.68, c.y));
-        lit = mix(lit, stock * 0.12, goods * 0.8) + shelf * vec3(0.04);
-        room = r < 0.6 ? lit : vec3(0.015, 0.015, 0.018);
+        vec3 lit = vec3(0.95, 0.8, 0.6) * mix(0.2, 1.0, smoothstep(0.1, 0.68, c.y));
+        lit = mix(lit, stock, goods * 0.8) + shelf * vec3(0.25);
+        room = r < 0.6 ? lit * uLight * 0.06 : daylight * 0.5;
+        // Lit letters after dark.
+        emission += letters * uLampLevel * uLight * 0.3 * vec3(1.0, 0.95, 0.85);
     } else if (kind == 3) {
         // Road paint, worn where the asphalt shows through.
         float wear = clamp(dot(albedo, vec3(0.33)) * 3.5, 0.0, 1.0);
@@ -182,10 +238,10 @@ void main() {
         rough = 0.6;
         metal = 0.0;
     } else if (kind == 4) {
-        emission = toLinear(vTint.rgb) * 3.0;
-        albedo *= 0.1;
+        emission = toLinear(vTint.rgb) * uLight * 10.0 * uLampLevel;
+        albedo *= 0.3;
     } else if (kind == 5) {
-        // The river: a few travelling waves and the sky in them.
+        // The river: a few travelling waves and the city in them.
         vec2 p = vPosition.xz;
         vec2 g = vec2(cos(p.x * 0.31 + uTime * 1.1), cos(p.y * 0.27 + uTime * 0.9)) * 0.04;
         g += vec2(0.8, 0.6) * cos(dot(p, vec2(0.8, 0.6)) * 1.2 + uTime * 1.9) * 0.025;
@@ -194,6 +250,9 @@ void main() {
         albedo = vec3(0.012, 0.025, 0.03);
         rough = 0.06;
         metal = 0.0;
+    } else if (kind == 6) {
+        emission = toLinear(vTint.rgb) * uLight * 5.0;
+        albedo *= 0.3;
     } else {
         albedo *= tint;
     }
@@ -202,16 +261,15 @@ void main() {
     float NdotL = max(dot(N, uSun), 0.0) * step(0.0, dot(n, uSun));
     float shadow = NdotL > 0.0 ? sunShadow() : 0.0;
     // Darker where walls meet the ground or a roof, and down in the street canyons.
-    float wallness = 1.0 - abs(n.y);
     float ao = vContact > -500.0 ? mix(1.0, mix(0.45, 1.0, smoothstep(0.0, 3.0, vPosition.y - vContact)), wallness) : 1.0;
     ao *= mix(0.55, 1.0, smoothstep(0.0, 80.0, vPosition.y));
     vec3 irradiance = sky(N, uSkyLevels - 2.0) * ao;
+    // The street lamps' pools of light, from dusk.
+    vec2 lampUv = (vPosition.xz - uLampArea.xy) / uLampArea.zw;
+    float pool = texture(uLamps, lampUv).r * uLampLevel * (1.0 - smoothstep(5.0, 11.0, vPosition.y));
+    vec3 lamps = vec3(1.0, 0.78, 0.5) * uLight * 0.45 * pool * mix(0.45, 1.0, max(N.y, 0.0));
     vec3 R = reflect(-V, N);
-    // Low in the streets a reflection sees the buildings across, not sky; below
-    // the horizon, the city's grey rather than the sky's mirror image.
-    float skyline = mix(0.45, 0.0, smoothstep(5.0, 140.0, vPosition.y));
-    vec3 street = sky(normalize(vec3(R.x, 0.05, R.z)), uSkyLevels - 3.0) * 0.16;
-    vec3 env = mix(street, sky(R, rough * (uSkyLevels - 3.0)), smoothstep(skyline - 0.15, skyline + 0.12, R.y));
+    vec3 env = reflection(R, rough);
     vec3 F0 = mix(vec3(0.04), albedo, metal);
     vec3 F = F0 + (max(vec3(1.0 - rough), F0) - F0) * pow(1.0 - NdotV, 5.0);
     vec3 H = normalize(V + uSun);
@@ -223,13 +281,12 @@ void main() {
     float G = NdotV / (NdotV * (1.0 - k) + k) / max(NdotL * (1.0 - k) + k, 1e-3);
     vec3 Fs = F0 + (1.0 - F0) * pow(1.0 - max(dot(H, V), 0.0), 5.0);
     vec3 sunlight = uSunColor * NdotL * shadow;
-    vec3 color = albedo * (1.0 - metal) * (sunlight + irradiance) + D * G * Fs * 0.25 * sunlight +
+    vec3 color = albedo * (1.0 - metal) * (sunlight + irradiance + lamps) + D * G * Fs * 0.25 * sunlight +
                  env * F * mix(ao, 1.0, 0.4);
     if (glass > 0.0) {
-        // A flat pane: the room behind it, the sky (or the street) on it.
+        // A flat pane: the room behind it, the city or the sky on it.
         float gv = max(dot(n, V), 1e-3);
-        vec3 gr = reflect(-V, n);
-        vec3 genv = mix(street, sky(gr, 0.5), smoothstep(skyline - 0.15, skyline + 0.12, gr.y));
+        vec3 genv = reflection(reflect(-V, n), 0.03);
         float fresnel = 0.04 + 0.96 * pow(1.0 - gv, 5.0);
         vec3 pane = room * (1.0 - fresnel) + genv * mix(0.3, 1.0, fresnel);
         float gh = max(dot(n, H), 0.0), ga = 0.0025;
@@ -243,7 +300,7 @@ void main() {
     vec3 look = -V;
     vec3 hazeColor = sky(normalize(vec3(look.x, max(look.y, 0.02), look.z)), uSkyLevels - 4.0);
     color = mix(color, hazeColor, haze);
-    outColor = vec4(aces(color * uExposure), 1.0);
+    outColor = uCapture == 1 ? vec4(color, 1.0) : vec4(aces(color * uExposure), 1.0);
 }
 )";
 constexpr const char* depthVertex = R"(#version 300 es
@@ -266,9 +323,11 @@ void main() {
 constexpr const char* skyFragment = R"(#version 300 es
 precision highp float;
 uniform sampler2D uSky;
+uniform samplerCube uProbe;
 uniform mat4 uInverse;
 uniform vec3 uEye;
-uniform float uExposure;
+uniform float uExposure, uSkyScale;
+uniform int uCapture, uShowProbe;
 in vec2 vClip;
 out vec4 outColor;
 )" SPIDY_SKY_GLSL R"(
@@ -277,7 +336,9 @@ void main() {
     vec3 d = normalize(p.xyz / p.w - uEye);
     // The picture's lower half mirrors its sky: under the horizon, the horizon's haze.
     vec3 c = d.y >= 0.02 ? sky(d, 0.0) : sky(normalize(vec3(d.x, 0.02, d.z)), 4.0);
-    outColor = vec4(aces(c * uExposure), 1.0);
+    if (uShowProbe == 1)
+        c = textureLod(uProbe, d, 0.0).rgb;
+    outColor = uCapture == 1 ? vec4(c, 1.0) : vec4(aces(c * uExposure), 1.0);
 }
 )";
 constexpr const char* overlayVertex = R"(#version 300 es
@@ -572,6 +633,7 @@ void Renderer::initialize(const CityMesh& mesh, const ReadAsset& read,
         const std::string folder = std::string("city/") + info(static_cast<Material>(m)).folder + "/";
         const Image color = decode(read(folder + "color.jpg"));
         Textures material;
+        material.facade = info(static_cast<Material>(m)).bays > 0;
         if (color.pixels.empty()) {
             log("City: no photo for " + folder + ", drawing it flat");
             const auto flat = flatColor(static_cast<Material>(m));
@@ -604,7 +666,10 @@ void Renderer::initialize(const CityMesh& mesh, const ReadAsset& read,
         material.surface = texture(GL_RGBA8, color.width, color.height, packed.data(), anisotropy_);
         materials_.push_back(material);
     }
-    loadSky(read, log);
+    const char* skies[] = {"city/sky_day.hdr", "city/sky_sunset.hdr", "city/sky_night.hdr"};
+    for (std::size_t t = 0; t < skies_.size(); ++t)
+        skies_[t] = loadSky(skies[t], read, log);
+    lampMap(mesh.lamps);
     // The sun's shadow map.
     glGenTextures(1, &shadowMap_);
     glBindTexture(GL_TEXTURE_2D, shadowMap_);
@@ -624,11 +689,59 @@ void Renderer::initialize(const CityMesh& mesh, const ReadAsset& read,
     glReadBuffer(GL_NONE);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw std::runtime_error("City: the shadow map's framebuffer is incomplete");
+    // The reflection probe: the city round the viewer in a floating point
+    // cube map, where the GPU can draw floating point colour.
+    if (hasExtension("GL_EXT_color_buffer_half_float") || hasExtension("GL_EXT_color_buffer_float")) {
+        probeLevels_ = levels(static_cast<int>(probeSize_), static_cast<int>(probeSize_));
+        glGenTextures(1, &probe_);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, probe_);
+        glTexStorage2D(GL_TEXTURE_CUBE_MAP, static_cast<GLsizei>(probeLevels_), GL_RGBA16F,
+                       static_cast<GLsizei>(probeSize_), static_cast<GLsizei>(probeSize_));
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glGenRenderbuffers(1, &probeDepth_);
+        glBindRenderbuffer(GL_RENDERBUFFER, probeDepth_);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, static_cast<GLsizei>(probeSize_),
+                              static_cast<GLsizei>(probeSize_));
+        glGenFramebuffers(1, &probeFramebuffer_);
+        glBindFramebuffer(GL_FRAMEBUFFER, probeFramebuffer_);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, probeDepth_);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, probe_,
+                               0);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            log("City: no floating point cube map to draw into; reflections see only the sky");
+            probeLevels_ = 0;
+        }
+    } else {
+        log("City: no floating point colour; reflections see only the sky");
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    facadeUniform_ = uniform(cityProgram_, "uFacade");
+    timeOfDay(TimeOfDay::Day);
 }
 
-void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std::string&)>& log) {
-    const auto bytes = read("city/sky.hdr");
+void Renderer::timeOfDay(TimeOfDay time) {
+    time_ = time;
+    const auto t = static_cast<std::size_t>(time);
+    // Everything in the day sky's units: each sky scaled to how bright that
+    // time is, the display adapted to it as eyes do (night still reads),
+    // and the city's own lights the same at any hour.
+    const float day = skies_[0].mean;
+    const float target[] = {1, .3f, .006f}, adapt[] = {1, .4f, .1f}, lamps[] = {0, .5f, 1},
+                rooms[] = {.02f, .22f, .45f};
+    skyScale_ = target[t] * day / std::max(skies_[t].mean, 1e-4f);
+    exposure_ = .55f / (day * adapt[t]);
+    light_ = day;
+    lampLevel_ = lamps[t];
+    windowsLit_ = rooms[t];
+}
+
+Renderer::Sky Renderer::loadSky(const std::string& path, const ReadAsset& read,
+                                const std::function<void(const std::string&)>& log) {
+    Sky out;
+    const auto bytes = read(path);
     int width = 0, height = 0, channels = 0;
     float* hdr = bytes.empty() ? nullptr
                                : stbi_loadf_from_memory(bytes.data(), static_cast<int>(bytes.size()), &width,
@@ -638,8 +751,8 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
         level.assign(hdr, hdr + static_cast<std::size_t>(width) * height * 3);
         stbi_image_free(hdr);
     } else {
-        // A plain gradient sky: blue overhead, pale at the horizon.
-        log("City: no sky.hdr, drawing a plain sky");
+        // A plain gradient sky: blue overhead, pale at the horizon, a sun.
+        log("City: no " + path + ", drawing a plain sky");
         width = 256;
         height = 128;
         level.resize(static_cast<std::size_t>(width) * height * 3);
@@ -661,10 +774,10 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
             }
         }
     }
-    glGenTextures(1, &sky_);
-    glBindTexture(GL_TEXTURE_2D, sky_);
-    skyLevels_ = levels(width, height);
-    glTexStorage2D(GL_TEXTURE_2D, static_cast<GLsizei>(skyLevels_), GL_RGB9_E5, width, height);
+    glGenTextures(1, &out.texture);
+    glBindTexture(GL_TEXTURE_2D, out.texture);
+    out.levels = levels(width, height);
+    glTexStorage2D(GL_TEXTURE_2D, static_cast<GLsizei>(out.levels), GL_RGB9_E5, width, height);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -680,9 +793,10 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
             ++skyCount;
         }
     skyMean /= static_cast<double>(std::max<std::size_t>(skyCount, 1));
+    out.mean = static_cast<float>(skyMean);
     int w = width, h = height;
     bool sunFound = false;
-    for (unsigned l = 0; l < skyLevels_; ++l) {
+    for (unsigned l = 0; l < out.levels; ++l) {
         glTexSubImage2D(GL_TEXTURE_2D, static_cast<GLint>(l), 0, 0, w, h, GL_RGB, GL_FLOAT, level.data());
         if (!sunFound && w <= 64) {
             float best = -1;
@@ -700,16 +814,16 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
             const float u = (static_cast<float>(bx) + .5f) / static_cast<float>(w),
                         v = (static_cast<float>(by) + .5f) / static_cast<float>(h);
             const float theta = v * 3.14159265f, phi = (u - .5f) * 6.2831853f;
-            sun_ = normalized(
+            out.sun = normalized(
                 Vec3{std::sin(theta) * std::sin(phi), std::cos(theta), -std::sin(theta) * std::cos(phi)});
             // The sun's light to the sky's, as on a clear-ish day, in the sun's own colour.
             const float* p = &level[(static_cast<std::size_t>(by) * w + bx) * 3];
             const Vec3 c{p[0], p[1], p[2]};
             const float lum = std::max(.2126f * c.x + .7152f * c.y + .0722f * c.z, 1e-4f);
             const Vec3 hue = c * (1 / lum);
-            sunColor_ = Vec3{std::clamp(hue.x, .6f, 1.4f), std::clamp(hue.y, .6f, 1.4f),
-                             std::clamp(hue.z, .6f, 1.4f)} *
-                        static_cast<float>(4.5 * skyMean);
+            out.colour = Vec3{std::clamp(hue.x, .5f, 1.6f), std::clamp(hue.y, .5f, 1.4f),
+                              std::clamp(hue.z, .4f, 1.4f)} *
+                         static_cast<float>(4.5 * skyMean);
             sunFound = true;
         }
         if (w == 1 && h == 1)
@@ -731,11 +845,60 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
         w = nw;
         h = nh;
     }
-    if (sun_.y < .15f)
-        sun_ = normalized(Vec3{sun_.x, .15f, sun_.z});
-    // A display that shows the sky's mean as a mid grey.
-    exposure = static_cast<float>(.55 / std::max(skyMean, 1e-3));
-    fog_ = Vec3{.62f, .68f, .74f};
+    // Never quite on the horizon: shadows stay finite, low light still lands.
+    // A low sun shines through more air: redder.
+    if (out.sun.y < .12f)
+        out.sun = normalized(Vec3{out.sun.x, .12f, out.sun.z});
+    const float low = std::clamp((.35f - out.sun.y) / .25f, 0.f, 1.f);
+    out.colour = Vec3{out.colour.x * (1 + .35f * low), out.colour.y * (1 - .05f * low),
+                      out.colour.z * (1 - .4f * low)};
+    return out;
+}
+
+void Renderer::lampMap(const std::vector<Vec3>& lamps) {
+    // Each lamp's pool of light on the ground, a metre a texel, over where
+    // the lamps are: brightest under the lamp, gone 14 m out.
+    constexpr float inf = std::numeric_limits<float>::infinity(), reach = 14, texel = 1;
+    Vec3 lo{inf, 0, inf}, hi{-inf, 0, -inf};
+    for (const auto& l : lamps) {
+        lo = {std::min(lo.x, l.x), 0, std::min(lo.z, l.z)};
+        hi = {std::max(hi.x, l.x), 0, std::max(hi.z, l.z)};
+    }
+    if (lamps.empty())
+        lo = hi = {};
+    lampOrigin_ = lo - Vec3{reach, 0, reach};
+    const int w = static_cast<int>((hi.x - lo.x + 2 * reach) / texel) + 1,
+              h = static_cast<int>((hi.z - lo.z + 2 * reach) / texel) + 1;
+    lampSize_ = {static_cast<float>(w) * texel, 1, static_cast<float>(h) * texel};
+    std::vector<float> light(static_cast<std::size_t>(w) * h);
+    const int r = static_cast<int>(reach / texel);
+    for (const auto& l : lamps) {
+        const int cx = static_cast<int>((l.x - lampOrigin_.x) / texel),
+                  cz = static_cast<int>((l.z - lampOrigin_.z) / texel);
+        for (int z = std::max(cz - r, 0); z <= std::min(cz + r, h - 1); ++z)
+            for (int x = std::max(cx - r, 0); x <= std::min(cx + r, w - 1); ++x) {
+                const float dx = (static_cast<float>(x) + .5f) * texel + lampOrigin_.x - l.x,
+                            dz = (static_cast<float>(z) + .5f) * texel + lampOrigin_.z - l.z;
+                const float d = std::sqrt(dx * dx + dz * dz);
+                if (d >= reach)
+                    continue;
+                const float edge = 1 - d / reach;
+                light[static_cast<std::size_t>(z) * w + x] += edge * edge / (1 + d * d / 16);
+            }
+    }
+    std::vector<std::uint8_t> bytes(light.size());
+    for (std::size_t i = 0; i < light.size(); ++i)
+        bytes[i] = static_cast<std::uint8_t>(std::min(light[i], 1.f) * 255 + .5f);
+    glGenTextures(1, &lamps_);
+    glBindTexture(GL_TEXTURE_2D, lamps_);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_R8, w, h);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, bytes.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 }
 
 void Renderer::drawCity(const Mat4& vp, bool shadowPass) {
@@ -769,6 +932,7 @@ void Renderer::drawCity(const Mat4& vp, bool shadowPass) {
             glBindTexture(GL_TEXTURE_2D, materials_[bound].albedo);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, materials_[bound].surface);
+            glUniform1f(facadeUniform_, materials_[bound].facade ? 1.f : 0.f);
         }
         first = d.first;
         count = d.count;
@@ -780,7 +944,8 @@ void Renderer::drawCity(const Mat4& vp, bool shadowPass) {
 void Renderer::shadows(Vec3 viewer) {
     // An orthographic view down the sun's rays, centred on the viewer and
     // moved in whole texels so the edges of shadows do not crawl.
-    const Vec3 z = sun_, x = normalized(cross(std::abs(sun_.y) > .99f ? Vec3{1, 0, 0} : Vec3{0, 1, 0}, z)),
+    const Vec3 sun = sunDirection();
+    const Vec3 z = sun, x = normalized(cross(std::abs(sun.y) > .99f ? Vec3{1, 0, 0} : Vec3{0, 1, 0}, z)),
                y = cross(z, x);
     const float texel = 2 * shadowReach_ / static_cast<float>(shadowSize_);
     Vec3 centre = viewer;
@@ -808,9 +973,107 @@ void Renderer::shadows(Vec3 viewer) {
     glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
+constexpr float fogDensity = .0016f;
+
+void Renderer::cityUniforms(const Mat4& vp, Vec3 eye, float seconds, bool capture) {
+    const auto& sky = skies_[static_cast<std::size_t>(time_)];
+    glUseProgram(cityProgram_);
+    matrix(cityProgram_, "uViewProjection", vp);
+    matrix(cityProgram_, "uShadow", shadowMatrix_);
+    vec3(cityProgram_, "uEye", eye);
+    vec3(cityProgram_, "uSun", sky.sun);
+    vec3(cityProgram_, "uSunColor", sky.colour * skyScale_);
+    glUniform1f(uniform(cityProgram_, "uSkyLevels"), static_cast<float>(sky.levels - 1));
+    glUniform1f(uniform(cityProgram_, "uSkyScale"), skyScale_);
+    glUniform1f(uniform(cityProgram_, "uExposure"), exposure_ * brightness);
+    glUniform1f(uniform(cityProgram_, "uTime"), seconds);
+    glUniform1f(uniform(cityProgram_, "uFogDensity"), fogDensity);
+    glUniform1f(uniform(cityProgram_, "uLight"), light_);
+    glUniform1f(uniform(cityProgram_, "uLampLevel"), lampLevel_);
+    glUniform1f(uniform(cityProgram_, "uWindowsLit"), windowsLit_);
+    glUniform1f(uniform(cityProgram_, "uProbeLevels"), capture ? 0.f : static_cast<float>(probeLevels_));
+    glUniform1i(uniform(cityProgram_, "uCapture"), capture ? 1 : 0);
+    glUniform4f(uniform(cityProgram_, "uLampArea"), lampOrigin_.x, lampOrigin_.z, lampSize_.x, lampSize_.z);
+    glUniform1i(uniform(cityProgram_, "uAlbedo"), 0);
+    glUniform1i(uniform(cityProgram_, "uSurface"), 1);
+    glUniform1i(uniform(cityProgram_, "uSky"), 2);
+    glUniform1i(uniform(cityProgram_, "uShadowMap"), 3);
+    glUniform1i(uniform(cityProgram_, "uLamps"), 4);
+    glUniform1i(uniform(cityProgram_, "uProbe"), 5);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, sky.texture);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, shadowMap_);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, lamps_);
+    glActiveTexture(GL_TEXTURE5);
+    // Never the cube being drawn into: a capture reads only the sky.
+    glBindTexture(GL_TEXTURE_CUBE_MAP, capture ? 0 : probe_);
+}
+
+void Renderer::drawSky(const Mat4& vp, Vec3 eye, bool capture) {
+    const auto& sky = skies_[static_cast<std::size_t>(time_)];
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    glUseProgram(skyProgram_);
+    matrix(skyProgram_, "uInverse", inverse(vp));
+    vec3(skyProgram_, "uEye", eye);
+    glUniform1f(uniform(skyProgram_, "uExposure"), exposure_ * brightness);
+    glUniform1f(uniform(skyProgram_, "uSkyScale"), skyScale_);
+    glUniform1i(uniform(skyProgram_, "uCapture"), capture ? 1 : 0);
+    glUniform1i(uniform(skyProgram_, "uShowProbe"), !capture && showProbe && probeLevels_ ? 1 : 0);
+    glUniform1i(uniform(skyProgram_, "uSky"), 2);
+    glUniform1i(uniform(skyProgram_, "uProbe"), 5);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, sky.texture);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, capture ? 0 : probe_);
+    glBindVertexArray(skyArray_);
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+}
+
+void Renderer::reflections(Vec3 at, unsigned faces) {
+    if (!probeLevels_)
+        return;
+    // OpenGL's cube faces: +x -x +y -y +z -z, each looking out with its own up.
+    const Vec3 looks[6] = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+    const Vec3 ups[6] = {{0, -1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}, {0, -1, 0}, {0, -1, 0}};
+    const float quarter = .78539816f;
+    const Mat4 projection = glProjection({-quarter, quarter, -quarter, quarter}, .5f, 2500);
+    glBindFramebuffer(GL_FRAMEBUFFER, probeFramebuffer_);
+    glViewport(0, 0, static_cast<GLsizei>(probeSize_), static_cast<GLsizei>(probeSize_));
+    for (unsigned k = 0; k < std::min(faces, 6u); ++k) {
+        const unsigned face = probeFace_;
+        probeFace_ = (probeFace_ + 1) % 6;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,
+                               probe_, 0);
+        const Vec3 f = looks[face], s = normalized(cross(f, ups[face])), u = cross(s, f);
+        const Mat4 view{s.x,  s.y,  s.z,  -dot(s, at), u.x, u.y, u.z, -dot(u, at),
+                        -f.x, -f.y, -f.z, dot(f, at),  0,   0,   0,   1};
+        const Mat4 vp = multiply(projection, view);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        glDepthMask(GL_TRUE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        cityUniforms(vp, at, 0, true);
+        drawCity(vp, false);
+        drawSky(vp, at, true);
+        const GLenum depth = GL_DEPTH_ATTACHMENT;
+        glInvalidateFramebuffer(GL_FRAMEBUFFER, 1, &depth);
+    }
+    glBindTexture(GL_TEXTURE_CUBE_MAP, probe_);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
 void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
                     std::span<const Vertex> overlay, float seconds) {
-    constexpr float fogDensity = .0016f;
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -819,29 +1082,14 @@ void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
-    glClearColor(fog_.x, fog_.y, fog_.z, 1);
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glUseProgram(cityProgram_);
-    matrix(cityProgram_, "uViewProjection", vp);
-    matrix(cityProgram_, "uShadow", shadowMatrix_);
-    vec3(cityProgram_, "uEye", eye);
-    vec3(cityProgram_, "uSun", sun_);
-    vec3(cityProgram_, "uSunColor", sunColor_);
-    glUniform1f(uniform(cityProgram_, "uSkyLevels"), static_cast<float>(skyLevels_ - 1));
-    glUniform1f(uniform(cityProgram_, "uExposure"), exposure);
-    glUniform1f(uniform(cityProgram_, "uTime"), seconds);
-    glUniform1f(uniform(cityProgram_, "uFogDensity"), fogDensity);
-    glUniform1i(uniform(cityProgram_, "uAlbedo"), 0);
-    glUniform1i(uniform(cityProgram_, "uSurface"), 1);
-    glUniform1i(uniform(cityProgram_, "uSky"), 2);
-    glUniform1i(uniform(cityProgram_, "uShadowMap"), 3);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, sky_);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, shadowMap_);
-    drawCity(vp, false);
+    if (!showProbe) {
+        cityUniforms(vp, eye, seconds, false);
+        drawCity(vp, false);
+    }
     // The lab's own geometry: solid, then see-through over it.
-    if (!overlay.empty()) {
+    if (!overlay.empty() && !showProbe) {
         glBindVertexArray(overlayArray_);
         glBindBuffer(GL_ARRAY_BUFFER, overlayBuffer_);
         const std::size_t bytes = overlay.size() * sizeof(Vertex);
@@ -853,7 +1101,10 @@ void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
         glUseProgram(overlayProgram_);
         matrix(overlayProgram_, "uViewProjection", vp);
         vec3(overlayProgram_, "uEye", eye);
-        vec3(overlayProgram_, "uFog", fog_);
+        // Far props fade to the haze's tone of the hour.
+        const float haze[] = {.62f, .5f, .03f};
+        const float h = haze[static_cast<std::size_t>(time_)];
+        vec3(overlayProgram_, "uFog", Vec3{h, h * 1.05f, h * 1.15f});
         glUniform1f(uniform(overlayProgram_, "uFogDensity"), fogDensity);
         glDisable(GL_CULL_FACE);
         glUniform1i(uniform(overlayProgram_, "uTranslucent"), 0);
@@ -867,16 +1118,6 @@ void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
         glBindVertexArray(0);
     }
     // The sky last, only where nothing else drew.
-    glDepthMask(GL_FALSE);
-    glDisable(GL_CULL_FACE);
-    glUseProgram(skyProgram_);
-    matrix(skyProgram_, "uInverse", inverse(vp));
-    vec3(skyProgram_, "uEye", eye);
-    glUniform1f(uniform(skyProgram_, "uExposure"), exposure);
-    glUniform1i(uniform(skyProgram_, "uSky"), 2);
-    glBindVertexArray(skyArray_);
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindVertexArray(0);
-    glDepthMask(GL_TRUE);
+    drawSky(vp, eye, false);
 }
 } // namespace spidy::city

@@ -7,15 +7,16 @@ in quest/assets.lock.json:
   * ambientCG (https://ambientcg.com, CC0): facades, bricks, asphalt, paving,
     gravel, metal, wood -- the 1K JPG set of each, of which the colour,
     normal (OpenGL), roughness and metalness maps are kept;
-  * Poly Haven (https://polyhaven.com, CC0): the sky, a 2K HDRI;
+  * Poly Haven (https://polyhaven.com, CC0): three skies, 2K HDRIs: day,
+    sunset and night;
   * stb_image.h (https://github.com/nothings/stb, public domain / MIT).
 
 Run it once before building the Quest app (or the Linux preview):
 
     python3 quest/tools/fetch_assets.py
 
-Materials land in quest/app/src/main/assets/city/<Material>/ and the sky in
-quest/app/src/main/assets/city/sky.hdr, stb in third_party/stb/. Files
+Materials land in quest/app/src/main/assets/city/<Material>/ and the skies in
+quest/app/src/main/assets/city/sky_<time>.hdr, stb in third_party/stb/. Files
 already there with the pinned hash are kept. Standard library only.
 """
 import argparse
@@ -107,15 +108,18 @@ def main():
                   material["files"], map_name)
             write(os.path.join(folder, MAPS[map_name]), data)
 
-    sky = lock["sky"]
-    path = os.path.join(ASSETS, "sky.hdr")
-    if args.update_lock or not have(path, sky["sha256"]):
-        print(f"sky: downloading {sky['id']} from Poly Haven")
-        data = download(sky["url"])
-        check("sky", data, sky["sha256"], args.update_lock, sky, "sha256")
-        write(path, data)
-    else:
-        print("sky: up to date")
+    for sky in lock["skies"]:
+        path = os.path.join(ASSETS, sky["file"])
+        if args.update_lock or not have(path, sky["sha256"]):
+            print(f"{sky['file']}: downloading {sky['id']} from Poly Haven")
+            data = download(sky["url"])
+            check(sky["file"], data, sky["sha256"], args.update_lock, sky, "sha256")
+            write(path, data)
+        else:
+            print(f"{sky['file']}: up to date")
+    old_sky = os.path.join(ASSETS, "sky.hdr")  # before the skies had times of day
+    if os.path.exists(old_sky):
+        os.remove(old_sky)
 
     stb = lock["stb_image"]
     path = os.path.join(STB, "stb_image.h")

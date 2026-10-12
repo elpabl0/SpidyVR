@@ -18,16 +18,23 @@ Spidy's own swinging, web grab, props and thugs, and the overlay hands and webs.
   towers stepping back to crowns and spires, office slabs with mechanical floors,
   and glass towers with masts, taller towards downtown (around the start) and a
   second, midtown cluster to the north.
-- **Photo materials:** 17 CC0 scans from [ambientCG](https://ambientcg.com):
+- **Photo materials:** 20 CC0 scans from [ambientCG](https://ambientcg.com):
   facades with their windows, bricks, limestone, concrete, asphalt, paving,
-  gravel roofs, corrugated steel and wood ([ASSETS.md](ASSETS.md)). Plain brick
+  gravel and tar roofs, corrugated steel and wood ([ASSETS.md](ASSETS.md)),
+  weathered in the shader: rain streaks down the walls, dirt at their feet,
+  stains on the roofs. Plain brick
   and stone walls get windows drawn per floor and bay: frames, sills, rooms
   behind the glass, some lit, some with blinds. Ground floors get shop windows
   with stock on shelves and sign bands, or roll-down gates.
-- **Light from a real sky:** a CC0 [Poly Haven](https://polyhaven.com) HDRI.
-  The sun's direction and colour come from it, the sky's light and reflections
-  from its blurred levels, a shadow map follows you, and haze thickens near the
-  streets. Glass reflects the sky above and the street below.
+- **Day, sunset and night** (X switches), each lit by a real sky: CC0
+  [Poly Haven](https://polyhaven.com) HDRIs. The sun's (or the moon's)
+  direction and colour come from it, the sky's light from its blurred levels,
+  a shadow map follows you, and haze thickens near the streets. At sunset the
+  light turns low and golden; at night the street lamps throw pools of light,
+  shop windows and signs glow, and offices and flats light up floor by floor.
+- **Reflections of the city:** a cube map of the city round you, redrawn a
+  face a frame, is what glass towers, windows, wet-looking pavement and the
+  river reflect: the buildings across the street, the skyline, the lights.
 - **Streets:** sidewalks and curbs, lamps, traffic lights, double yellow lines,
   lane dashes, crosswalks and stop lines.
 
@@ -53,13 +60,13 @@ You need:
 Then, from the repository:
 
 ```sh
-python3 quest/tools/fetch_assets.py   # ~55 MB of CC0 textures and the sky, checked by SHA-256
+python3 quest/tools/fetch_assets.py   # ~75 MB of CC0 textures and three skies, checked by SHA-256
 cd quest
 export ANDROID_HOME="$HOME/Library/Android/sdk"   # where Android Studio puts the SDK
 ./gradlew assembleRelease
 ```
 
-The APK is `quest/app/build/outputs/apk/release/app-release.apk` (about 55 MB),
+The APK is `quest/app/build/outputs/apk/release/app-release.apk` (about 75 MB),
 signed with your machine's debug key, which is all side-loading needs. Opening
 the `quest` folder in Android Studio works too: it finds the Gradle project, and
 the green Run button installs it on a connected headset.
@@ -134,17 +141,20 @@ adb logcat -s SpidyCity
 | Jump / point launch | **A** |
 | Turn | **Right stick**: 30-degree snap turns |
 | Back to the launch roof | **Y** (also when you fall in the river) |
+| Day, sunset, night | **X** |
 
 The coloured cube at the end of each hand's aim is where its web would stick.
 
 ## Performance
 
 It targets the Quest's default 72 Hz at the runtime's recommended eye size with
-4x multisampling: about 205,000 triangles in the whole city, culled per block,
-drawn a row of blocks per call, with one 2048 shadow map. It has not yet been
+4x multisampling: about 240,000 triangles in the whole city, culled per block,
+drawn a row of blocks per call, one 2048 shadow map, and one 256-pixel face of
+the reflection cube a frame. It has not yet been
 measured on a headset (see *Status*): if it stutters, the first knobs are in
-`src/city_renderer.cpp` (`shadowSize_`, `shadowReach_`, the haze) and the city's
-size in `city::Layout`.
+`src/city_renderer.cpp` (`shadowSize_`, `shadowReach_`, `probeSize_`, the haze)
+and the city's size in `city::Layout`; skipping `renderer.reflections()` in
+`quest_main.cpp` falls back to sky-only reflections.
 
 ## Status
 

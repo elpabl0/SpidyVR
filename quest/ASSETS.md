@@ -29,12 +29,20 @@ of each; the colour, normal (OpenGL), roughness and metalness maps are kept.
 | RoofGravel | [Gravel028](https://ambientcg.com/view?id=Gravel028) | Flat roofs |
 | Metal | [CorrugatedSteel009](https://ambientcg.com/view?id=CorrugatedSteel009) | Rooftop machinery, water tower steel |
 | Wood | [WoodSiding008](https://ambientcg.com/view?id=WoodSiding008) | Water tanks |
+| OrangeBrick | [Bricks086](https://ambientcg.com/view?id=Bricks086) | Row houses, warehouses, prewar |
+| Stucco | [Concrete040](https://ambientcg.com/view?id=Concrete040) | Rendered row houses and prewar |
+| TarRoof | [Asphalt033](https://ambientcg.com/view?id=Asphalt033) | Flat roofs in tar |
 
-## Sky: Poly Haven, CC0
+## Skies: Poly Haven, CC0
 
-[Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky)
-by Greg Zaal, [Poly Haven](https://polyhaven.com), [CC0](https://polyhaven.com/license):
-the 2K HDR. The renderer finds the sun in it and lights the city by it.
+Pure-sky 2K HDRIs from [Poly Haven](https://polyhaven.com), [CC0](https://polyhaven.com/license).
+The renderer finds the sun (or moon) in each and lights the city by it.
+
+| Time | Sky | By |
+|---|---|---|
+| Day | [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky) | Greg Zaal (sky edits: Jarod Guest) |
+| Sunset | [Kloppenheim 06 (Pure Sky)](https://polyhaven.com/a/kloppenheim_06_puresky) | Greg Zaal (sky edits: Jarod Guest) |
+| Night | [Kloppenheim 02 (Pure Sky)](https://polyhaven.com/a/kloppenheim_02_puresky) | Greg Zaal (sky edits: Jarod Guest) |
 
 ## Image decoding: stb_image
 

@@ -133,17 +133,36 @@ adb logcat -s SpidyCity
 
 | Do this | With |
 |---|---|
-| Shoot a web, swing on it | Squeeze a **grip**; release to let go |
+| Shoot a web, swing on it | Squeeze a **grip**; release to let go (or the trigger: `web_button = trigger`) |
 | Reel in | **Trigger**, while that hand's web holds |
 | Zip | Pull the hand sharply away from the anchor |
 | Grab a crate, barrel or thug | Grip aimed at it (a yellow marker shows over it); trigger reels it in, a sharp pull yanks it, let go to throw |
 | Walk, run | **Left stick** |
 | Jump / point launch | **A** |
-| Turn | **Right stick**: 30-degree snap turns |
+| Charged leap | Hold **A** on the ground and let go: the longer you hold, the higher (up to about 11 m); with the left stick, forward too |
+| Walls | Walk at one, or fly or jump into it, and you stay on it: at speed you run along it, then stop. **Left stick** walks it (pushed at the wall: up it, over the top onto the roof), **A** jumps off, a web pulls you off. Walking it or stopped, your view turns so the wall is your floor (`stand_on_walls`) |
+| Flip (experimental, off by default: `flips`, `flip_speed`) | **Left stick** in the air turns you over, as fast as you tilt it; let go to come back level. Tap **A** in the air: one flip towards where the stick points |
+| Turn | **Right stick**: 30-degree snap turns (`snap_turn`), or hold to turn smoothly (`smooth_turn`) |
 | Back to the launch roof | **Y** (also when you fall in the river) |
 | Day, sunset, night | **X** |
 
 The coloured cube at the end of each hand's aim is where its web would stick.
+
+### Settings
+
+Until the lab has its own menu, its settings (the same as the game's SPIDY VR
+tab) are in a text file on the headset. The app writes it with the defaults
+the first time it starts:
+
+```sh
+adb pull /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
+# edit it, e.g. smooth_turn = 120, web_button = trigger, flips = on
+adb push settings.txt /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
+```
+
+Then restart the app. It has `snap_turn`, `smooth_turn`, `web_button`,
+`flips`, `flip_speed`, `stand_on_walls`, `swing_speed`, `weight`, `air_webs`,
+`physical_webs` and `haptics`; `adb logcat -s SpidyCity` shows what it read.
 
 ## Performance
 
@@ -171,8 +190,12 @@ and the frame rate on the headset are untested. Reports welcome.
   and `CityWorld`, the swing's collision through a grid.
 - `src/city_renderer.cpp`: the OpenGL ES 3 renderer shared by the app and the
   preview.
+- `src/lab_motion.cpp` (`include/spidy/lab_motion.hpp`): the lab's movement,
+  the game's tracking rig (turning, flips, the web button, standing on walls)
+  and charged leap on the lab's own swing; `spidy_lab_motion_tests` plays each
+  in the city.
 - `quest/app/src/main/cpp/`: the app: `quest_xr.cpp` (EGL, OpenXR session,
-  input, swapchains), `quest_main.cpp` (the lab on the city).
+  input, swapchains), `quest_main.cpp` (the lab on the city, its settings file).
 - `apps/city_preview.cpp`: renders a few views without a window (Linux, EGL):
 
   ```sh

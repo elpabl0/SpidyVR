@@ -31,7 +31,8 @@ class Renderer {
     // With a current OpenGL ES 3.0 context. Materials or a sky that cannot be
     // read draw in flat colours; `log` gets a line for each. Throws when a
     // shader does not build.
-    void initialize(const CityMesh& mesh, const ReadAsset& read, const std::function<void(const std::string&)>& log);
+    void initialize(const CityMesh& mesh, const ReadAsset& read,
+                    const std::function<void(const std::string&)>& log);
     // Once a frame, before the views: the sun's shadow map around `viewer`.
     void shadows(Vec3 viewer);
     // One view into the bound framebuffer (cleared here) at width x height.

@@ -49,7 +49,8 @@ int main() {
         for (std::size_t i = 0; i < again.boxes().size(); ++i)
             check(again.boxes()[i].max.y == theCity().boxes()[i].max.y, "a building's height differs");
         const City other(7);
-        check(other.mesh().vertices.size() != theCity().mesh().vertices.size(), "another seed built the same city");
+        check(other.mesh().vertices.size() != theCity().mesh().vertices.size(),
+              "another seed built the same city");
     });
     test("the city has variety: hundreds of buildings, towers and walk-ups", [] {
         check(theCity().buildings() > 500, "only " + std::to_string(theCity().buildings()) + " buildings");
@@ -62,7 +63,8 @@ int main() {
             towers += b.max.y > 120;
             low += b.max.y > 8 && b.max.y < 25;
         }
-        check(tallest > 150 && tallest <= 310, "tallest " + std::to_string(tallest)); // masts and spires included
+        check(tallest > 150 && tallest <= 310,
+              "tallest " + std::to_string(tallest)); // masts and spires included
         check(towers > 20 && low > 50, "towers " + std::to_string(towers) + ", low " + std::to_string(low));
         bool used[materialCount]{};
         for (const auto& d : theCity().mesh().draws)
@@ -184,7 +186,8 @@ int main() {
         Input in;
         in.hands[1].tracked = true;
         in.hands[1].grip = 1;
-        in.hands[1].aim = {launch.feet + Vec3{.3f, 1.4f, -.3f}, arc({0, 0, -1}, normalized(Vec3{.2f, .6f, -1}))};
+        in.hands[1].aim = {launch.feet + Vec3{.3f, 1.4f, -.3f},
+                           arc({0, 0, -1}, normalized(Vec3{.2f, .6f, -1}))};
         in.hands[1].gripRelativeToHead = {.3f, -.3f, -.3f};
         // Walk off the roof's edge holding a web.
         const Vec3 start = swing.body().position;

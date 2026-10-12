@@ -159,6 +159,15 @@ Needs Visual Studio 2022 C++ Build Tools with CMake and Ninja, and a Windows SDK
 opens a standalone OpenXR swinging lab that needs no game. Releases are built on
 GitHub: **Actions > Release > Run workflow**.
 
+## Quest city lab (standalone, no PC)
+
+Spider-Man Remastered runs only on Windows, so the mod needs a Windows PC. The
+**swinging lab** also runs natively on a Quest 3 (or 2, Pro, 3S), in a
+procedural, photo-textured Manhattan-like city: build the APK on a Mac, Linux
+or Windows (or let GitHub Actions build it), install it over USB or Wi-Fi with
+`adb`, and play it from the headset's library. [quest/README.md](quest/README.md)
+has the steps.
+
 ## How it works
 
 Spidy loads its modules into the running game and renders two extra scene views

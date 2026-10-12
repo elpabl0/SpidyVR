@@ -1,6 +1,7 @@
 #include "spidy/city.hpp"
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <limits>
 #include <numeric>
 #include <optional>
@@ -9,15 +10,12 @@ namespace spidy::city {
 namespace {
 // metres per tile across and up (plain surfaces); floors and bays per tile (facades).
 constexpr MaterialInfo materials[materialCount] = {
-    {"Facade018A", 0, 0, 6, 6},          {"Facade019A", 0, 0, 6, 6},
-    {"Facade020A", 0, 0, 6, 6},          {"Facade006", 0, 0, 8, 14},
-    {"Facade001", 0, 0, 10, 16},         {"Facade005", 0, 0, 24, 32},
-    {"Facade017", 0, 0, 12, 12},         {"Bricks085", 2.4f, 1.2f, 0, 0},
-    {"Bricks101", 2, 2, 0, 0},           {"Bricks094", 1.8f, .9f, 0, 0},
-    {"Bricks066", 2.4f, 2.4f, 0, 0},     {"Concrete046", 2.4f, 2.4f, 0, 0},
-    {"Asphalt020L", 4.6f, 4.6f, 0, 0},   {"PavingStones136", 5, 5, 0, 0},
-    {"Gravel028", 6, 6, 0, 0},           {"CorrugatedSteel009", 2, 1, 0, 0},
-    {"WoodSiding008", 2, 2, 0, 0},
+    {"Facade018A", 0, 0, 6, 6},         {"Facade019A", 0, 0, 6, 6},      {"Facade020A", 0, 0, 6, 6},
+    {"Facade006", 0, 0, 8, 14},         {"Facade001", 0, 0, 10, 16},     {"Facade005", 0, 0, 24, 32},
+    {"Facade017", 0, 0, 12, 12},        {"Bricks085", 2.4f, 1.2f, 0, 0}, {"Bricks101", 2, 2, 0, 0},
+    {"Bricks094", 1.8f, .9f, 0, 0},     {"Bricks066", 2.4f, 2.4f, 0, 0}, {"Concrete046", 2.4f, 2.4f, 0, 0},
+    {"Asphalt020L", 4.6f, 4.6f, 0, 0},  {"PavingStones136", 5, 5, 0, 0}, {"Gravel028", 6, 6, 0, 0},
+    {"CorrugatedSteel009", 2, 1, 0, 0}, {"WoodSiding008", 2, 2, 0, 0},
 };
 // splitmix64: the same numbers on every compiler.
 struct Random {
@@ -85,7 +83,7 @@ class Generator {
         std::vector<std::uint32_t> indices;
     };
     struct Corners {
-        float u0, v0, u1, v1;         // texture at o and at o + R + U
+        float u0, v0, u1, v1;                 // texture at o and at o + R + U
         float b0 = 0, f0 = 0, b1 = 0, f1 = 0; // window cells likewise
     };
 
@@ -147,8 +145,7 @@ class Generator {
         const auto& mi = info(m);
         const Vec3 r = normalized(R), u = normalized(U);
         const float u0 = dot(o, r) / mi.metres, v0 = dot(o, u) / mi.up;
-        quad(m, o, R, U, {u0, v0, u0 + length(R) / mi.metres, v0 + length(U) / mi.up}, contact, tint,
-             style);
+        quad(m, o, R, U, {u0, v0, u0 + length(R) / mi.metres, v0 + length(U) / mi.up}, contact, tint, style);
     }
     // The faces of a box textured by world position. faces: +x -x +z -z +y -y bits.
     void box(Material m, Vec3 lo, Vec3 hi, Tint tint = neutral, unsigned faces = 0x3f, float contact = -1000,
@@ -176,9 +173,8 @@ class Generator {
             const Vec3 na{std::sin(a), 0, std::cos(a)}, nb{std::sin(b), 0, std::cos(b)};
             const Vec3 pa = base + na * radius, pb = base + nb * radius;
             const float ua = a * radius / mi.metres, ub = b * radius / mi.metres;
-            quad(m, pa, pb - pa, {0, height, 0},
-                 {ua, base.y / mi.up, ub, (base.y + height) / mi.up}, base.y, tint, {},
-                 {na, nb, nb, na});
+            quad(m, pa, pb - pa, {0, height, 0}, {ua, base.y / mi.up, ub, (base.y + height) / mi.up}, base.y,
+                 tint, {}, {na, nb, nb, na});
             if (top) {
                 const Vec3 c = base + Vec3{0, height, 0};
                 triangle(m, c, pa + Vec3{0, height, 0}, pb + Vec3{0, height, 0},
@@ -221,10 +217,8 @@ class Generator {
         const Vec3 r = R * (1 / len);
         const float u0 = dot(at, r) / mi.metres;
         quad(b.wall, at, R, U,
-             {u0, y0 / mi.up, u0 + len / mi.metres, y1 / mi.up, 0, f0, static_cast<float>(bays),
-              f1},
-             b.ground, tint,
-             {static_cast<std::uint8_t>(Surface::Windows), b.windowWidth, b.windowHeight, 0});
+             {u0, y0 / mi.up, u0 + len / mi.metres, y1 / mi.up, 0, f0, static_cast<float>(bays), f1},
+             b.ground, tint, {static_cast<std::uint8_t>(Surface::Windows), b.windowWidth, b.windowHeight, 0});
     }
     void storefront(const Building& b, Vec3 o, Vec3 R, Tint tint) {
         const float len = length(R);
@@ -236,8 +230,7 @@ class Generator {
         const Vec3 at{o.x, b.ground, o.z}, r = R * (1 / len);
         const float u0 = dot(at, r) / mi.metres;
         quad(m, at, R, {0, b.base - b.ground, 0},
-             {u0, b.ground / mi.up, u0 + len / mi.metres, b.base / mi.up, 0, 0,
-              static_cast<float>(bays), 1},
+             {u0, b.ground / mi.up, u0 + len / mi.metres, b.base / mi.up, 0, 0, static_cast<float>(bays), 1},
              b.ground, tint, {static_cast<std::uint8_t>(Surface::Storefront), 0, 0, 0});
     }
     // Four walls of [x0,x1]x[z0,z1] from y0 to y1, storefronts below b.base.
@@ -283,7 +276,8 @@ Tint shade(Tint t, float s) {
 void Generator::run() {
     const auto& L = layout_;
     const float pitchX = L.blockX + L.avenueRoad, pitchZ = L.blockZ + L.streetRoad;
-    const float width = static_cast<float>(L.avenues) * pitchX, depth = static_cast<float>(L.streets) * pitchZ;
+    const float width = static_cast<float>(L.avenues) * pitchX,
+                depth = static_cast<float>(L.streets) * pitchZ;
     const float ox = -width / 2, oz = -depth / 2;
     const auto blocks = static_cast<std::size_t>(L.avenues * L.streets);
     chunks_.resize(blocks + 1);
@@ -298,7 +292,8 @@ void Generator::run() {
         for (int i = 0; i < L.avenues; ++i) {
             chunk_ = static_cast<std::uint32_t>(j * L.avenues + i);
             const float x0 = ox + static_cast<float>(i) * pitchX, z0 = oz + static_cast<float>(j) * pitchZ;
-            surface(Material::Asphalt, {x0, 0, z0 + pitchZ}, {pitchX, 0, 0}, {0, 0, -pitchZ}, 0, {96, 96, 98, 0});
+            surface(Material::Asphalt, {x0, 0, z0 + pitchZ}, {pitchX, 0, 0}, {0, 0, -pitchZ}, 0,
+                    {96, 96, 98, 0});
             const float bx0 = x0 + L.avenueRoad / 2, bz0 = z0 + L.streetRoad / 2;
             Random random{random_.next()};
             block(i, j, bx0, bz0, bx0 + L.blockX, bz0 + L.blockZ, random);
@@ -306,7 +301,8 @@ void Generator::run() {
     // Road paint, the avenues' segments (x = an avenue's centre) and the streets'.
     for (int j = 0; j <= L.streets; ++j)
         for (int i = 0; i <= L.avenues; ++i) {
-            chunk_ = static_cast<std::uint32_t>(std::min(j, L.streets - 1) * L.avenues + std::min(i, L.avenues - 1));
+            chunk_ = static_cast<std::uint32_t>(std::min(j, L.streets - 1) * L.avenues +
+                                                std::min(i, L.avenues - 1));
             const float cx = ox + static_cast<float>(i) * pitchX, cz = oz + static_cast<float>(j) * pitchZ;
             if (j < L.streets)
                 markings(cx - L.avenueRoad / 2, cz + L.streetRoad / 2, cx + L.avenueRoad / 2,
@@ -328,10 +324,14 @@ void Generator::run() {
     }
     const Tint rail{70, 74, 78, 0};
     const float wallBottom = City::waterLevel - 1.5f;
-    surface(Material::Concrete, {ex1, wallBottom, ez1}, {0, 0, ez0 - ez1}, {0, top - wallBottom, 0}, wallBottom);
-    surface(Material::Concrete, {ex0, wallBottom, ez0}, {0, 0, ez1 - ez0}, {0, top - wallBottom, 0}, wallBottom);
-    surface(Material::Concrete, {ex0, wallBottom, ez1}, {ex1 - ex0, 0, 0}, {0, top - wallBottom, 0}, wallBottom);
-    surface(Material::Concrete, {ex1, wallBottom, ez0}, {ex0 - ex1, 0, 0}, {0, top - wallBottom, 0}, wallBottom);
+    surface(Material::Concrete, {ex1, wallBottom, ez1}, {0, 0, ez0 - ez1}, {0, top - wallBottom, 0},
+            wallBottom);
+    surface(Material::Concrete, {ex0, wallBottom, ez0}, {0, 0, ez1 - ez0}, {0, top - wallBottom, 0},
+            wallBottom);
+    surface(Material::Concrete, {ex0, wallBottom, ez1}, {ex1 - ex0, 0, 0}, {0, top - wallBottom, 0},
+            wallBottom);
+    surface(Material::Concrete, {ex1, wallBottom, ez0}, {ex0 - ex1, 0, 0}, {0, top - wallBottom, 0},
+            wallBottom);
     const float railY = top + 1.05f, in = .4f;
     box(Material::Metal, {ex0 + in - .04f, railY, ez0 + in}, {ex0 + in + .04f, railY + .06f, ez1 - in}, rail);
     box(Material::Metal, {ex1 - in - .04f, railY, ez0 + in}, {ex1 - in + .04f, railY + .06f, ez1 - in}, rail);
@@ -350,8 +350,8 @@ void Generator::run() {
     const Style water{static_cast<std::uint8_t>(Surface::Water), 0, 0, 0};
     const float wx0 = ex0 - margin, wz0 = ez0 - margin, wx1 = ex1 + margin, wz1 = ez1 + margin;
     const auto sheet = [&](float a0, float b0, float a1, float b1) {
-        surface(Material::Concrete, {a0, City::waterLevel, b1}, {a1 - a0, 0, 0}, {0, 0, b0 - b1}, -1000, neutral,
-                water);
+        surface(Material::Concrete, {a0, City::waterLevel, b1}, {a1 - a0, 0, 0}, {0, 0, b0 - b1}, -1000,
+                neutral, water);
     };
     sheet(wx0, wz0, wx1, ez0);
     sheet(wx0, ez1, wx1, wz1);
@@ -424,8 +424,9 @@ void Generator::block(int i, int j, float bx0, float bz0, float bx1, float bz1, 
         }
         first = false;
         const bool tower = d > .4f && remaining >= 28 && random.chance(.5f + .4f * (d - .4f));
-        float w = tower ? random.range(28, 46) : d < .25f && random.chance(.6f) ? random.range(7.5f, 13)
-                                                                                 : random.range(14, 30);
+        float w = tower                            ? random.range(28, 46)
+                  : d < .25f && random.chance(.6f) ? random.range(7.5f, 13)
+                                                   : random.range(14, 30);
         if (remaining - w < 7.5f)
             w = remaining;
         if (tower) {
@@ -438,11 +439,11 @@ void Generator::block(int i, int j, float bx0, float bz0, float bx1, float bz1, 
                 if (w < 13) {
                     b->kind = random.chance(.88f) ? Kind::Rowhouse : Kind::Warehouse;
                 } else if (d > .3f) {
-                    const Kind kinds[] = {Kind::Prewar, Kind::Prewar, Kind::Office, Kind::Office, Kind::Deco,
-                                          Kind::Glass, Kind::Prewar};
+                    const Kind kinds[] = {Kind::Prewar, Kind::Prewar, Kind::Office, Kind::Office,
+                                          Kind::Deco,   Kind::Glass,  Kind::Prewar};
                     b->kind = random.pick(kinds);
                 } else {
-                    const Kind kinds[] = {Kind::Prewar, Kind::Prewar, Kind::Warehouse, Kind::Office,
+                    const Kind kinds[] = {Kind::Prewar,   Kind::Prewar, Kind::Warehouse, Kind::Office,
                                           Kind::Rowhouse, Kind::Prewar, Kind::Warehouse};
                     b->kind = random.pick(kinds);
                 }
@@ -468,7 +469,8 @@ void Generator::building(Building& b, Random& random, bool launch) {
     float storefronts = 0;
     switch (b.kind) {
     case Kind::Rowhouse: {
-        const Material walls[] = {Material::RedBrick, Material::CleanBrick, Material::DarkBrick, Material::RedBrick};
+        const Material walls[] = {Material::RedBrick, Material::CleanBrick, Material::DarkBrick,
+                                  Material::RedBrick};
         b.wall = random.pick(walls);
         b.trim = random.chance(.5f) ? Material::Limestone : Material::Concrete;
         b.floorHeight = 3.2f;
@@ -506,7 +508,8 @@ void Generator::building(Building& b, Random& random, bool launch) {
         break;
     }
     case Kind::Deco: {
-        const Material walls[] = {Material::Limestone, Material::StonePiers, Material::Limestone, Material::DarkBrick};
+        const Material walls[] = {Material::Limestone, Material::StonePiers, Material::Limestone,
+                                  Material::DarkBrick};
         b.wall = random.pick(walls);
         b.trim = Material::Limestone;
         b.floorHeight = 3.5f;
@@ -594,7 +597,8 @@ void Generator::building(Building& b, Random& random, bool launch) {
     // A string course over the shop windows.
     if (b.storefront) {
         const auto& t = b.tiers.front();
-        box(b.trim, {t.x0 - .12f, b.base - .35f, t.z0 - .12f}, {t.x1 + .12f, b.base, t.z1 + .12f}, trimTint, 0x2f);
+        box(b.trim, {t.x0 - .12f, b.base - .35f, t.z0 - .12f}, {t.x1 + .12f, b.base, t.z1 + .12f}, trimTint,
+            0x2f);
     }
     const Tier& roof = b.tiers.back();
     if (b.parapet) {
@@ -619,7 +623,8 @@ void Generator::building(Building& b, Random& random, bool launch) {
 }
 
 void Generator::roofProps(const Building& b, const Tier& top, Random& random) {
-    const float rx0 = top.x0 + 1.5f, rz0 = top.z0 + 1.5f, rx1 = top.x1 - 1.5f, rz1 = top.z1 - 1.5f, y = top.top;
+    const float rx0 = top.x0 + 1.5f, rz0 = top.z0 + 1.5f, rx1 = top.x1 - 1.5f, rz1 = top.z1 - 1.5f,
+                y = top.top;
     if (rx1 - rx0 < 3 || rz1 - rz0 < 3)
         return;
     std::vector<Bounds> taken;
@@ -693,16 +698,17 @@ void Generator::roofProps(const Building& b, const Tier& top, Random& random) {
             float s = std::min(w, d) * .6f, base = y;
             for (int k = 0; k < 3 && s > 3; ++k) {
                 const float h = 6.f - static_cast<float>(k);
-                box(b.trim, centre + Vec3{-s / 2, base - y, -s / 2}, centre + Vec3{s / 2, base - y + h, s / 2},
-                    {b.tint[0], b.tint[1], b.tint[2], b.seed}, 0x1f, base);
+                box(b.trim, centre + Vec3{-s / 2, base - y, -s / 2},
+                    centre + Vec3{s / 2, base - y + h, s / 2}, {b.tint[0], b.tint[1], b.tint[2], b.seed},
+                    0x1f, base);
                 collider(centre + Vec3{-s / 2, base - y, -s / 2}, centre + Vec3{s / 2, base - y + h, s / 2},
                          {.6f, .6f, .55f});
                 base += h;
                 s *= .65f;
             }
             const float spire = random.range(14, 30);
-            box(Material::Metal, centre + Vec3{-.35f, base - y, -.35f}, centre + Vec3{.35f, base - y + spire, .35f},
-                shade(metal, 1.2f), 0x1f);
+            box(Material::Metal, centre + Vec3{-.35f, base - y, -.35f},
+                centre + Vec3{.35f, base - y + spire, .35f}, shade(metal, 1.2f), 0x1f);
             collider(centre + Vec3{-.35f, base - y, -.35f}, centre + Vec3{.35f, base - y + spire, .35f},
                      {.7f, .7f, .7f});
         } else {
@@ -712,7 +718,8 @@ void Generator::roofProps(const Building& b, const Tier& top, Random& random) {
     case Kind::Office:
     case Kind::Glass: {
         // Mechanical floors in metal cladding, and maybe a mast.
-        const float mw = w * random.range(.45f, .65f), md = d * random.range(.45f, .65f), h = random.range(4.5f, 6.5f);
+        const float mw = w * random.range(.45f, .65f), md = d * random.range(.45f, .65f),
+                    h = random.range(4.5f, 6.5f);
         const Vec3 lo = centre - Vec3{mw / 2, 0, md / 2}, hi = centre + Vec3{mw / 2, h, md / 2};
         box(Material::Metal, lo, hi, metal, 0xf, y);
         surface(Material::RoofGravel, {lo.x, y + h, hi.z}, {mw, 0, 0}, {0, 0, -md}, y + h);
@@ -740,8 +747,8 @@ void Generator::waterTower(Vec3 base, float r, Random& random) {
             box(Material::Metal, p - Vec3{.15f, 0, .15f}, p + Vec3{.15f, legs, .15f}, steel, 0xf);
             collider(p - Vec3{.15f, 0, .15f}, p + Vec3{.15f, legs, .15f}, {.3f, .3f, .3f});
         }
-    box(Material::Metal, base + Vec3{-r * 1.05f, legs - .2f, -r * 1.05f}, base + Vec3{r * 1.05f, legs, r * 1.05f},
-        steel);
+    box(Material::Metal, base + Vec3{-r * 1.05f, legs - .2f, -r * 1.05f},
+        base + Vec3{r * 1.05f, legs, r * 1.05f}, steel);
     const Vec3 t = base + Vec3{0, legs, 0};
     cylinder(Material::Wood, t, r, tank, 14, wood, false);
     for (float band : {.9f, 2.4f, 3.9f})
@@ -774,8 +781,8 @@ void Generator::trafficLight(Vec3 foot, Vec3 out, bool green) {
         const bool lit = green ? k == 2 : k == 0;
         const Tint colour = !lit ? Tint{30, 30, 28, 0} : green ? Tint{90, 255, 150, 0} : Tint{255, 50, 30, 0};
         const Vec3 centre = foot + Vec3{0, lights[k], 0} + out * .235f;
-        surface(Material::Concrete, centre - across * .13f - up * .13f, across * .26f, up * .26f, -1000, colour,
-                {static_cast<std::uint8_t>(lit ? Surface::Lamp : Surface::Plain), 0, 0, 0});
+        surface(Material::Concrete, centre - across * .13f - up * .13f, across * .26f, up * .26f, -1000,
+                colour, {static_cast<std::uint8_t>(lit ? Surface::Lamp : Surface::Plain), 0, 0, 0});
     }
 }
 
@@ -876,7 +883,8 @@ CityWorld::CityWorld(std::vector<Box> boxes, float cell) : boxes_(std::move(boxe
     std::vector<bool> large(boxes_.size());
     for (std::size_t k = 0; k < boxes_.size(); ++k) {
         const auto& b = boxes_[k];
-        const float cells = std::ceil((b.max.x - b.min.x) / cell_ + 1) * std::ceil((b.max.z - b.min.z) / cell_ + 1);
+        const float cells =
+            std::ceil((b.max.x - b.min.x) / cell_ + 1) * std::ceil((b.max.z - b.min.z) / cell_ + 1);
         large[k] = cells > 256;
         if (large[k]) {
             large_.push_back(static_cast<std::uint32_t>(k));

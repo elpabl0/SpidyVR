@@ -41,7 +41,8 @@ enum class Material : std::uint8_t {
 };
 constexpr std::size_t materialCount = static_cast<std::size_t>(Material::Count);
 struct MaterialInfo {
-    const char* folder; // under city/: color.jpg, normal.jpg, roughness.jpg, and metalness.jpg when it has one
+    const char*
+        folder; // under city/: color.jpg, normal.jpg, roughness.jpg, and metalness.jpg when it has one
     // A plain surface's texture repeats every `metres` across and `up` up
     // (or along -z on the ground). A facade's texture holds `floors` storeys
     // and `bays` window bays (0 for a plain surface).
@@ -61,9 +62,9 @@ enum class Surface : std::uint8_t {
 };
 struct CityVertex {
     Vec3 position{}, normal{};
-    float u{}, v{};        // texture coordinates
-    float bay{}, floor{};  // window grid cell coordinates (Windows, Storefront)
-    float contact{};       // height of the ground or roof this face stands on
+    float u{}, v{};                                     // texture coordinates
+    float bay{}, floor{};                               // window grid cell coordinates (Windows, Storefront)
+    float contact{};                                    // height of the ground or roof this face stands on
     std::array<std::uint8_t, 4> tint{128, 128, 128, 0}; // rgb albedo scale (128: 1), a seed
     std::array<std::uint8_t, 4> style{};                // Surface, window width and height (of 255), spare
 };
@@ -87,10 +88,10 @@ struct Launch {
     float yaw{};
 };
 struct Layout {
-    int avenues = 9, streets = 14;           // blocks across (x) and along (z)
-    float blockX = 110, blockZ = 70;         // a block with its sidewalks, metres
-    float avenueRoad = 20, streetRoad = 12;  // road between blocks, curb to curb
-    float sidewalk = 4.5f, curb = .15f;      // sidewalk width, and its height over the road
+    int avenues = 9, streets = 14;          // blocks across (x) and along (z)
+    float blockX = 110, blockZ = 70;        // a block with its sidewalks, metres
+    float avenueRoad = 20, streetRoad = 12; // road between blocks, curb to curb
+    float sidewalk = 4.5f, curb = .15f;     // sidewalk width, and its height over the road
 };
 class City {
   public:
@@ -145,10 +146,11 @@ class CityWorld final : public World {
     std::uint32_t nextQuery() const;
     template <class Visit> void boxesIn(Vec3 lo, Vec3 hi, Visit&& visit) const;
     std::vector<Box> boxes_;
-    std::vector<std::uint32_t> large_;            // boxes over too many cells: always tested
-    std::vector<std::uint32_t> cellStart_, items_; // cell c's boxes: items_[cellStart_[c] .. cellStart_[c + 1])
-    std::vector<std::uint64_t> ids_;              // sorted
-    mutable std::vector<std::uint32_t> seen_;     // per box: the query that tested it last
+    std::vector<std::uint32_t> large_; // boxes over too many cells: always tested
+    std::vector<std::uint32_t> cellStart_,
+        items_;                               // cell c's boxes: items_[cellStart_[c] .. cellStart_[c + 1])
+    std::vector<std::uint64_t> ids_;          // sorted
+    mutable std::vector<std::uint32_t> seen_; // per box: the query that tested it last
     mutable std::uint32_t query_{};
     mutable std::vector<std::uint32_t> candidates_;
     float cell_{}, x0_{}, z0_{};

@@ -29,14 +29,14 @@ void contextOrThrow() {
     if (display == EGL_NO_DISPLAY || !eglInitialize(display, nullptr, nullptr))
         throw std::runtime_error("No EGL display");
     eglBindAPI(EGL_OPENGL_ES_API);
-    const EGLint configAttributes[] = {EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
-                                       EGL_NONE};
+    const EGLint configAttributes[] = {EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE,
+                                       EGL_PBUFFER_BIT, EGL_NONE};
     EGLConfig config{};
     EGLint count = 0;
     eglChooseConfig(display, configAttributes, &config, 1, &count);
     const EGLint contextAttributes[] = {EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 0, EGL_NONE};
-    EGLContext context = eglCreateContext(display, count ? config : EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT,
-                                          contextAttributes);
+    EGLContext context =
+        eglCreateContext(display, count ? config : EGL_NO_CONFIG_KHR, EGL_NO_CONTEXT, contextAttributes);
     if (context == EGL_NO_CONTEXT || !eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, context))
         throw std::runtime_error("No OpenGL ES 3 context");
     std::cout << "GL: " << glGetString(GL_RENDERER) << " / " << glGetString(GL_VERSION) << '\n';
@@ -55,7 +55,8 @@ int main(int argc, char** argv) {
     }
     try {
         const std::string assets = argv[1], out = argv[2];
-        const unsigned width = argc == 5 ? std::stoul(argv[3]) : 1280, height = argc == 5 ? std::stoul(argv[4]) : 720;
+        const unsigned width = argc == 5 ? std::stoul(argv[3]) : 1280,
+                       height = argc == 5 ? std::stoul(argv[4]) : 720;
         contextOrThrow();
         const auto started = std::chrono::steady_clock::now();
         const City city;
@@ -68,14 +69,16 @@ int main(int argc, char** argv) {
             },
             [](const std::string& line) { std::cout << line << '\n'; });
         std::cout << "City and renderer ready in "
-                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count() << " s: "
-                  << city.buildings() << " buildings, " << city.mesh().indices.size() / 3 << " triangles\n";
+                  << std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count()
+                  << " s: " << city.buildings() << " buildings, " << city.mesh().indices.size() / 3
+                  << " triangles\n";
         unsigned framebuffer{}, color{}, depth{};
         glGenFramebuffers(1, &framebuffer);
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glGenTextures(1, &color);
         glBindTexture(GL_TEXTURE_2D, color);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_SRGB8_ALPHA8, static_cast<GLsizei>(width),
+                       static_cast<GLsizei>(height));
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color, 0);
         glGenRenderbuffers(1, &depth);
         glBindRenderbuffer(GL_RENDERBUFFER, depth);
@@ -118,15 +121,18 @@ int main(int argc, char** argv) {
             glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
             const Mat4 vp = multiply(glProjection(wide), viewMatrix(shot.camera));
             renderer.view(vp, shot.camera.position, width, height, overlay, 3);
-            glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA, GL_UNSIGNED_BYTE,
-                         pixels.data());
-            const auto ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+            glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA,
+                         GL_UNSIGNED_BYTE, pixels.data());
+            const auto ms =
+                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
             const std::string path = out + "/" + shot.name + ".ppm";
             std::ofstream f(path, std::ios::binary);
             f << "P6\n" << width << ' ' << height << "\n255\n";
             for (unsigned y = height; y-- > 0;)
                 for (unsigned x = 0; x < width; ++x)
-                    f.write(reinterpret_cast<const char*>(&pixels[(static_cast<std::size_t>(y) * width + x) * 4]), 3);
+                    f.write(
+                        reinterpret_cast<const char*>(&pixels[(static_cast<std::size_t>(y) * width + x) * 4]),
+                        3);
             std::cout << path << " (" << ms << " ms, GL error " << glGetError() << ")\n";
         }
         return 0;

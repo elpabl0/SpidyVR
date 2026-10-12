@@ -4,8 +4,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
-#include <stdexcept>
 #include <stb_image.h>
+#include <stdexcept>
 
 #ifndef GL_TEXTURE_MAX_ANISOTROPY_EXT
 #define GL_TEXTURE_MAX_ANISOTROPY_EXT 0x84FE
@@ -44,11 +44,13 @@ void main() {
 }
 )";
 // The sky's functions, shared by the city and the sky.
-#define SPIDY_SKY_GLSL                                                                                         \
-    "const float PI = 3.14159265;\n"                                                                           \
-    "vec2 skyUv(vec3 d) { return vec2(0.5 + atan(d.x, -d.z) / (2.0 * PI), acos(clamp(d.y, -1.0, 1.0)) / PI); }\n" \
-    "vec3 sky(vec3 d, float lod) { return textureLod(uSky, skyUv(d), max(lod, 0.0)).rgb; }\n"                  \
-    "vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }\n"
+#define SPIDY_SKY_GLSL                                                                                       \
+    "const float PI = 3.14159265;\n"                                                                         \
+    "vec2 skyUv(vec3 d) { return vec2(0.5 + atan(d.x, -d.z) / (2.0 * PI), acos(clamp(d.y, -1.0, 1.0)) / "    \
+    "PI); }\n"                                                                                               \
+    "vec3 sky(vec3 d, float lod) { return textureLod(uSky, skyUv(d), max(lod, 0.0)).rgb; }\n"                \
+    "vec3 aces(vec3 x) { return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); " \
+    "}\n"
 constexpr const char* cityFragment = R"(#version 300 es
 precision highp float;
 precision highp sampler2DShadow;
@@ -450,7 +452,8 @@ bool hasExtension(const char* name) {
     GLint count = 0;
     glGetIntegerv(GL_NUM_EXTENSIONS, &count);
     for (GLint i = 0; i < count; ++i)
-        if (const auto* e = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, static_cast<GLuint>(i)));
+        if (const auto* e =
+                reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, static_cast<GLuint>(i)));
             e && std::strcmp(e, name) == 0)
             return true;
     return false;
@@ -489,8 +492,22 @@ std::array<std::uint8_t, 4> flatColor(Material m) {
 
 Mat4 glProjection(EyeFov fov, float nearZ, float farZ) {
     const float l = std::tan(fov.left), r = std::tan(fov.right), d = std::tan(fov.down), u = std::tan(fov.up);
-    return {2 / (r - l), 0, (r + l) / (r - l), 0, 0, 2 / (u - d), (u + d) / (u - d), 0, 0, 0,
-            -(farZ + nearZ) / (farZ - nearZ), -2 * farZ * nearZ / (farZ - nearZ), 0, 0, -1, 0};
+    return {2 / (r - l),
+            0,
+            (r + l) / (r - l),
+            0,
+            0,
+            2 / (u - d),
+            (u + d) / (u - d),
+            0,
+            0,
+            0,
+            -(farZ + nearZ) / (farZ - nearZ),
+            -2 * farZ * nearZ / (farZ - nearZ),
+            0,
+            0,
+            -1,
+            0};
 }
 
 Renderer::~Renderer() {
@@ -516,8 +533,9 @@ void Renderer::initialize(const CityMesh& mesh, const ReadAsset& read,
                  mesh.vertices.data(), GL_STATIC_DRAW);
     glGenBuffers(1, &cityIndices_);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cityIndices_);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(mesh.indices.size() * sizeof(std::uint32_t)),
-                 mesh.indices.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 static_cast<GLsizeiptr>(mesh.indices.size() * sizeof(std::uint32_t)), mesh.indices.data(),
+                 GL_STATIC_DRAW);
     const auto stride = static_cast<GLsizei>(sizeof(CityVertex));
     const auto at = [](std::size_t offset) { return reinterpret_cast<const void*>(offset); };
     glEnableVertexAttribArray(0);
@@ -563,8 +581,10 @@ void Renderer::initialize(const CityMesh& mesh, const ReadAsset& read,
             materials_.push_back(material);
             continue;
         }
-        material.albedo = texture(GL_SRGB8_ALPHA8, color.width, color.height, color.pixels.data(), anisotropy_);
-        const Image normal = decode(read(folder + "normal.jpg")), rough = decode(read(folder + "roughness.jpg")),
+        material.albedo =
+            texture(GL_SRGB8_ALPHA8, color.width, color.height, color.pixels.data(), anisotropy_);
+        const Image normal = decode(read(folder + "normal.jpg")),
+                    rough = decode(read(folder + "roughness.jpg")),
                     metal = decode(read(folder + "metalness.jpg"));
         std::vector<std::uint8_t> packed(color.pixels.size());
         const auto sample = [&](const Image& image, int x, int y, int channel, std::uint8_t otherwise) {
@@ -624,13 +644,16 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
         height = 128;
         level.resize(static_cast<std::size_t>(width) * height * 3);
         for (int y = 0; y < height; ++y) {
-            const float up = std::cos(3.14159265f * (static_cast<float>(y) + .5f) / static_cast<float>(height));
+            const float up =
+                std::cos(3.14159265f * (static_cast<float>(y) + .5f) / static_cast<float>(height));
             const float t = std::clamp(up, 0.f, 1.f);
             const Vec3 c = Vec3{.85f, .9f, 1} * (1 - t) + Vec3{.3f, .5f, .9f} * t;
             for (int x = 0; x < width; ++x) {
-                const float sun = std::pow(std::max(0.f, std::cos((static_cast<float>(x) / width - .6f) * 6.283f) *
-                                                             std::cos((static_cast<float>(y) / height - .27f) * 3.14f)),
-                                           4000.f) * 3000;
+                const float sun =
+                    std::pow(std::max(0.f, std::cos((static_cast<float>(x) / width - .6f) * 6.283f) *
+                                               std::cos((static_cast<float>(y) / height - .27f) * 3.14f)),
+                             4000.f) *
+                    3000;
                 float* p = &level[(static_cast<std::size_t>(y) * width + x) * 3];
                 p[0] = c.x + sun;
                 p[1] = c.y + sun;
@@ -677,13 +700,15 @@ void Renderer::loadSky(const ReadAsset& read, const std::function<void(const std
             const float u = (static_cast<float>(bx) + .5f) / static_cast<float>(w),
                         v = (static_cast<float>(by) + .5f) / static_cast<float>(h);
             const float theta = v * 3.14159265f, phi = (u - .5f) * 6.2831853f;
-            sun_ = normalized(Vec3{std::sin(theta) * std::sin(phi), std::cos(theta), -std::sin(theta) * std::cos(phi)});
+            sun_ = normalized(
+                Vec3{std::sin(theta) * std::sin(phi), std::cos(theta), -std::sin(theta) * std::cos(phi)});
             // The sun's light to the sky's, as on a clear-ish day, in the sun's own colour.
             const float* p = &level[(static_cast<std::size_t>(by) * w + bx) * 3];
             const Vec3 c{p[0], p[1], p[2]};
             const float lum = std::max(.2126f * c.x + .7152f * c.y + .0722f * c.z, 1e-4f);
             const Vec3 hue = c * (1 / lum);
-            sunColor_ = Vec3{std::clamp(hue.x, .6f, 1.4f), std::clamp(hue.y, .6f, 1.4f), std::clamp(hue.z, .6f, 1.4f)} *
+            sunColor_ = Vec3{std::clamp(hue.x, .6f, 1.4f), std::clamp(hue.y, .6f, 1.4f),
+                             std::clamp(hue.z, .6f, 1.4f)} *
                         static_cast<float>(4.5 * skyMean);
             sunFound = true;
         }
@@ -718,20 +743,37 @@ void Renderer::drawCity(const Mat4& vp, bool shadowPass) {
     std::vector<bool> culled(chunks_.size());
     for (std::size_t c = 0; c < chunks_.size(); ++c)
         culled[c] = outside(vp, chunks_[c]);
+    // Visible chunks next to each other in the index buffer draw as one: a
+    // row of blocks is one call per material (the Quest's CPU counts calls).
     int bound = -1;
+    std::uint32_t first = 0, count = 0;
+    const auto flush = [&] {
+        if (count)
+            glDrawElements(
+                GL_TRIANGLES, static_cast<GLsizei>(count), GL_UNSIGNED_INT,
+                reinterpret_cast<const void*>(static_cast<std::size_t>(first) * sizeof(std::uint32_t)));
+        count = 0;
+    };
     for (const auto& d : draws_) {
         if (culled[d.chunk])
             continue;
-        if (!shadowPass && static_cast<int>(d.material) != bound) {
+        const bool same = shadowPass || static_cast<int>(d.material) == bound;
+        if (same && count && first + count == d.first) {
+            count += d.count;
+            continue;
+        }
+        flush();
+        if (!same) {
             bound = static_cast<int>(d.material);
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, materials_[bound].albedo);
             glActiveTexture(GL_TEXTURE1);
             glBindTexture(GL_TEXTURE_2D, materials_[bound].surface);
         }
-        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(d.count), GL_UNSIGNED_INT,
-                       reinterpret_cast<const void*>(static_cast<std::size_t>(d.first) * sizeof(std::uint32_t)));
+        first = d.first;
+        count = d.count;
     }
+    flush();
     glBindVertexArray(0);
 }
 
@@ -742,7 +784,8 @@ void Renderer::shadows(Vec3 viewer) {
                y = cross(z, x);
     const float texel = 2 * shadowReach_ / static_cast<float>(shadowSize_);
     Vec3 centre = viewer;
-    const float cx = std::round(dot(centre, x) / texel) * texel, cy = std::round(dot(centre, y) / texel) * texel;
+    const float cx = std::round(dot(centre, x) / texel) * texel,
+                cy = std::round(dot(centre, y) / texel) * texel;
     centre = x * cx + y * cy + z * dot(centre, z);
     const Vec3 eye = centre + z * 1200;
     const Mat4 view{x.x, x.y, x.z, -dot(x, eye), y.x, y.y, y.z, -dot(y, eye),
@@ -765,8 +808,8 @@ void Renderer::shadows(Vec3 viewer) {
     glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
-void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height, std::span<const Vertex> overlay,
-                    float seconds) {
+void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
+                    std::span<const Vertex> overlay, float seconds) {
     constexpr float fogDensity = .0016f;
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
     glEnable(GL_DEPTH_TEST);

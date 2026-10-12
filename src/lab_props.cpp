@@ -81,7 +81,7 @@ LabProps::LabProps() {
     const Vec3 feet[] = {{-5, 0, 2}, {4, 0, -3}, {0, 0, -9}, {-7, 0, -15}, {6, 0, -18}};
     for (unsigned i = 0; i < std::size(feet); ++i)
         initial_.push_back(labThug(people++, feet[i], 3.1416f + .3f * static_cast<float>(i % 3) - .3f,
-                                i % 2 ? Vec3{.13f, .13f, .16f} : Vec3{.3f, .1f, .1f}));
+                                   i % 2 ? Vec3{.13f, .13f, .16f} : Vec3{.3f, .1f, .1f}));
     props_ = initial_;
 }
 LabProps::LabProps(std::vector<LabProp> props) : props_(props), initial_(std::move(props)) {}

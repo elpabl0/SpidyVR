@@ -16,6 +16,12 @@ on:
       - 'include/spidy/lab_*.hpp'
       - 'apps/city_preview.cpp'
       - 'tests/city_tests.cpp'
+      - 'tests/lab_motion_tests.cpp'
+      - 'tests/lab_menu_tests.cpp'
+      - 'src/vr_settings.cpp'
+      - 'src/overlay_text.cpp'
+      - 'include/spidy/game_tracking.hpp'
+      - 'src/game_tracking.cpp'
       - 'CMakeLists.txt'
       - '.github/workflows/quest.yml'
 

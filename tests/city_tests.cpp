@@ -66,6 +66,7 @@ int main() {
         check(tallest > 150 && tallest <= 310,
               "tallest " + std::to_string(tallest)); // masts and spires included
         check(towers > 20 && low > 50, "towers " + std::to_string(towers) + ", low " + std::to_string(low));
+        check(theCity().mesh().lamps.size() > 500, "too few street lamps");
         bool used[materialCount]{};
         for (const auto& d : theCity().mesh().draws)
             used[static_cast<std::size_t>(d.material)] = true;

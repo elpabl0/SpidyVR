@@ -18,16 +18,23 @@ Spidy's own swinging, web grab, props and thugs, and the overlay hands and webs.
   towers stepping back to crowns and spires, office slabs with mechanical floors,
   and glass towers with masts, taller towards downtown (around the start) and a
   second, midtown cluster to the north.
-- **Photo materials:** 17 CC0 scans from [ambientCG](https://ambientcg.com):
+- **Photo materials:** 20 CC0 scans from [ambientCG](https://ambientcg.com):
   facades with their windows, bricks, limestone, concrete, asphalt, paving,
-  gravel roofs, corrugated steel and wood ([ASSETS.md](ASSETS.md)). Plain brick
+  gravel and tar roofs, corrugated steel and wood ([ASSETS.md](ASSETS.md)),
+  weathered in the shader: rain streaks down the walls, dirt at their feet,
+  stains on the roofs. Plain brick
   and stone walls get windows drawn per floor and bay: frames, sills, rooms
   behind the glass, some lit, some with blinds. Ground floors get shop windows
   with stock on shelves and sign bands, or roll-down gates.
-- **Light from a real sky:** a CC0 [Poly Haven](https://polyhaven.com) HDRI.
-  The sun's direction and colour come from it, the sky's light and reflections
-  from its blurred levels, a shadow map follows you, and haze thickens near the
-  streets. Glass reflects the sky above and the street below.
+- **Day, sunset and night** (X switches), each lit by a real sky: CC0
+  [Poly Haven](https://polyhaven.com) HDRIs. The sun's (or the moon's)
+  direction and colour come from it, the sky's light from its blurred levels,
+  a shadow map follows you, and haze thickens near the streets. At sunset the
+  light turns low and golden; at night the street lamps throw pools of light,
+  shop windows and signs glow, and offices and flats light up floor by floor.
+- **Reflections of the city:** a cube map of the city round you, redrawn a
+  face a frame, is what glass towers, windows, wet-looking pavement and the
+  river reflect: the buildings across the street, the skyline, the lights.
 - **Streets:** sidewalks and curbs, lamps, traffic lights, double yellow lines,
   lane dashes, crosswalks and stop lines.
 
@@ -53,13 +60,13 @@ You need:
 Then, from the repository:
 
 ```sh
-python3 quest/tools/fetch_assets.py   # ~55 MB of CC0 textures and the sky, checked by SHA-256
+python3 quest/tools/fetch_assets.py   # ~75 MB of CC0 textures and three skies, checked by SHA-256
 cd quest
 export ANDROID_HOME="$HOME/Library/Android/sdk"   # where Android Studio puts the SDK
 ./gradlew assembleRelease
 ```
 
-The APK is `quest/app/build/outputs/apk/release/app-release.apk` (about 55 MB),
+The APK is `quest/app/build/outputs/apk/release/app-release.apk` (about 75 MB),
 signed with your machine's debug key, which is all side-loading needs. Opening
 the `quest` folder in Android Studio works too: it finds the Gradle project, and
 the green Run button installs it on a connected headset.
@@ -126,25 +133,52 @@ adb logcat -s SpidyCity
 
 | Do this | With |
 |---|---|
-| Shoot a web, swing on it | Squeeze a **grip**; release to let go |
+| Shoot a web, swing on it | Squeeze a **grip**; release to let go (or the trigger: `web_button = trigger`) |
 | Reel in | **Trigger**, while that hand's web holds |
 | Zip | Pull the hand sharply away from the anchor |
 | Grab a crate, barrel or thug | Grip aimed at it (a yellow marker shows over it); trigger reels it in, a sharp pull yanks it, let go to throw |
 | Walk, run | **Left stick** |
 | Jump / point launch | **A** |
-| Turn | **Right stick**: 30-degree snap turns |
+| Charged leap | Hold **A** on the ground and let go: the longer you hold, the higher (up to about 11 m); with the left stick, forward too |
+| Walls | Walk at one, or fly or jump into it, and you stay on it: at speed you run along it, then stop. **Left stick** walks it (pushed at the wall: up it, over the top onto the roof), **A** jumps off, a web pulls you off. Walking it or stopped, your view turns so the wall is your floor (`stand_on_walls`) |
+| Flip (experimental, off by default: `flips`, `flip_speed`) | **Left stick** in the air turns you over, as fast as you tilt it; let go to come back level. Tap **A** in the air: one flip towards where the stick points |
+| Turn | **Right stick**: 30-degree snap turns (`snap_turn`), or hold to turn smoothly (`smooth_turn`) |
 | Back to the launch roof | **Y** (also when you fall in the river) |
+| Day, sunset, night | **X** |
+| Settings (pauses the lab) | **Menu** button (left controller) |
 
 The coloured cube at the end of each hand's aim is where its web would stick.
+
+### Settings
+
+The **menu** button opens the lab's settings in front of you and pauses
+everything behind it: the game's SPIDY VR settings that the lab has (web
+button, aim markers, webs in open air, swing speed, weight, physical webs,
+snap and smooth turn, vibration, stand on walls, flips and flip speed), the
+time of day, and a way back to the launch roof.
+
+- Point either controller at a row and pull its **trigger** for the next
+  choice; at the row's **<**, the one before. The help for the row you point
+  at shows below.
+- Or the **thumbsticks**: up and down choose a row, left and right its choice;
+  **A** the next choice.
+- **B**, the menu button, or **CLOSE** closes it.
+
+Changes apply at once and are kept in `settings.txt` in the app's files on
+the headset, which you can also edit with `adb pull` / `adb push`
+(`/sdcard/Android/data/io.github.spidy.citylab/files/settings.txt`), then
+restart the app.
 
 ## Performance
 
 It targets the Quest's default 72 Hz at the runtime's recommended eye size with
-4x multisampling: about 205,000 triangles in the whole city, culled per block,
-drawn a row of blocks per call, with one 2048 shadow map. It has not yet been
+4x multisampling: about 240,000 triangles in the whole city, culled per block,
+drawn a row of blocks per call, one 2048 shadow map, and one 256-pixel face of
+the reflection cube a frame. It has not yet been
 measured on a headset (see *Status*): if it stutters, the first knobs are in
-`src/city_renderer.cpp` (`shadowSize_`, `shadowReach_`, the haze) and the city's
-size in `city::Layout`.
+`src/city_renderer.cpp` (`shadowSize_`, `shadowReach_`, `probeSize_`, the haze)
+and the city's size in `city::Layout`; skipping `renderer.reflections()` in
+`quest_main.cpp` falls back to sky-only reflections.
 
 ## Status
 
@@ -161,8 +195,14 @@ and the frame rate on the headset are untested. Reports welcome.
   and `CityWorld`, the swing's collision through a grid.
 - `src/city_renderer.cpp`: the OpenGL ES 3 renderer shared by the app and the
   preview.
+- `src/lab_motion.cpp` (`include/spidy/lab_motion.hpp`): the lab's movement,
+  the game's tracking rig (turning, flips, the web button, standing on walls)
+  and charged leap on the lab's own swing; `spidy_lab_motion_tests` plays each
+  in the city.
+- `src/lab_menu.cpp` (`include/spidy/lab_menu.hpp`): the pause menu, drawn in
+  Spidy's stroke font; `spidy_lab_menu_tests` points and clicks through it.
 - `quest/app/src/main/cpp/`: the app: `quest_xr.cpp` (EGL, OpenXR session,
-  input, swapchains), `quest_main.cpp` (the lab on the city).
+  input, swapchains), `quest_main.cpp` (the lab on the city, its settings file).
 - `apps/city_preview.cpp`: renders a few views without a window (Linux, EGL):
 
   ```sh

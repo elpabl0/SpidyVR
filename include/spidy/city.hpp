@@ -37,6 +37,9 @@ enum class Material : std::uint8_t {
     RoofGravel,   // (Gravel028)
     Metal,        // rooftop machinery, poles (CorrugatedSteel009)
     Wood,         // water tanks (WoodSiding008)
+    OrangeBrick,  // plain walls (Bricks086)
+    Stucco,       // plain walls, rendered and painted (Concrete040)
+    TarRoof,      // flat roofs in tar (Asphalt033)
     Count
 };
 constexpr std::size_t materialCount = static_cast<std::size_t>(Material::Count);
@@ -57,8 +60,9 @@ enum class Surface : std::uint8_t {
     Windows,    // a plain wall with a window in each bay of each floor
     Storefront, // a ground floor of shop windows under a sign band
     Paint,      // road paint: tint is its colour, the material its wear
-    Lamp,       // a lamp's glowing glass: tint is its colour
-    Water,      // the river round the island: waves and the sky in them
+    Lamp,       // a street lamp's glass: tint is its colour; lit from dusk
+    Water,      // the river round the island: waves and the city in them
+    Signal,     // a traffic light's lit lamp: tint is its colour, always on
 };
 struct CityVertex {
     Vec3 position{}, normal{};
@@ -80,6 +84,7 @@ struct CityMesh {
     std::vector<std::uint32_t> indices;
     std::vector<Bounds> chunks;
     std::vector<Draw> draws; // by material, then chunk
+    std::vector<Vec3> lamps; // street lamps' glass, for their light at night
 };
 // Where the lab starts: the player's feet and facing (yaw, radians from -z,
 // as Rig::yaw), on the launch rooftop.

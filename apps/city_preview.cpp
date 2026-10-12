@@ -3,6 +3,7 @@
 // picture of each (binary PPM). For checking the city's look on a desktop or
 // in CI:  spidy_city_preview <assets dir> <out dir> [width height]
 #include "spidy/city_renderer.hpp"
+#include "spidy/lab_menu.hpp"
 #include "spidy/overlay_geometry.hpp"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -110,22 +111,13 @@ int main(int argc, char** argv) {
             {"shopfront", lookAt({city.launch().feet.x - 2, 1.7f, city.launch().feet.z + 24},
                                  {city.launch().feet.x - 2, 1.5f, city.launch().feet.z + 10})},
         };
-        const EyeFov fov{-.9f, .9f, -.6f, .6f};
         const float aspect = static_cast<float>(width) / static_cast<float>(height);
         const EyeFov wide{std::atan(-std::tan(.6f) * aspect), std::atan(std::tan(.6f) * aspect), -.6f, .6f};
-        (void)fov;
         std::vector<unsigned char> pixels(static_cast<std::size_t>(width) * height * 4);
-        for (const auto& shot : shots) {
-            const auto t0 = std::chrono::steady_clock::now();
-            renderer.shadows(shot.camera.position);
-            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-            const Mat4 vp = multiply(glProjection(wide), viewMatrix(shot.camera));
-            renderer.view(vp, shot.camera.position, width, height, overlay, 3);
+        const auto save = [&](const std::string& name, double ms) {
             glReadPixels(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height), GL_RGBA,
                          GL_UNSIGNED_BYTE, pixels.data());
-            const auto ms =
-                std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
-            const std::string path = out + "/" + shot.name + ".ppm";
+            const std::string path = out + "/" + name + ".ppm";
             std::ofstream f(path, std::ios::binary);
             f << "P6\n" << width << ' ' << height << "\n255\n";
             for (unsigned y = height; y-- > 0;)
@@ -134,7 +126,59 @@ int main(int argc, char** argv) {
                         reinterpret_cast<const char*>(&pixels[(static_cast<std::size_t>(y) * width + x) * 4]),
                         3);
             std::cout << path << " (" << ms << " ms, GL error " << glGetError() << ")\n";
+        };
+        const std::pair<TimeOfDay, const char*> times[] = {
+            {TimeOfDay::Day, "day"}, {TimeOfDay::Sunset, "sunset"}, {TimeOfDay::Night, "night"}};
+        for (const auto& [time, label] : times) {
+            renderer.timeOfDay(time);
+            for (const auto& shot : shots) {
+                const auto t0 = std::chrono::steady_clock::now();
+                renderer.shadows(shot.camera.position);
+                renderer.reflections(shot.camera.position, 6);
+                glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+                const Mat4 vp = multiply(glProjection(wide), viewMatrix(shot.camera));
+                renderer.view(vp, shot.camera.position, width, height, overlay, 3);
+                save(
+                    std::string(label) + "_" + shot.name,
+                    std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+            }
         }
+        // The pause menu over the roof at sunset, the right hand pointing at a row.
+        {
+            renderer.timeOfDay(TimeOfDay::Sunset);
+            const Pose head = lookAt(roof, roof + Vec3{0, 0, -10});
+            LabMenu menu;
+            menu.show(head);
+            vr_settings::Values values;
+            int time = 1;
+            LabMenu::Input in;
+            const Vec3 hand = head.position + Vec3{.22f, -.45f, -.3f};
+            const Vec3 target = menu.rowPoint(9);
+            in.aims[1] = {hand, arc({0, 0, -1}, normalized(target - hand))};
+            in.aimValid[1] = true;
+            in.seconds = 1.f / 72;
+            menu.update(in, values, time);
+            std::vector<Vertex> ui;
+            menu.draw(ui, values, time);
+            renderer.shadows(head.position);
+            renderer.reflections(head.position, 6);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            const Mat4 vp = multiply(glProjection(wide), viewMatrix(head));
+            renderer.view(vp, head.position, width, height, overlay, 3, ui);
+            save("menu", 0);
+        }
+        // The reflection probe drawn as the sky from the last view's place:
+        // it should match that view (a wrong cube face shows here).
+        renderer.timeOfDay(TimeOfDay::Day);
+        const auto& check = shots[0].camera;
+        renderer.shadows(check.position);
+        renderer.reflections(check.position, 6);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        const Mat4 vp = multiply(glProjection(wide), viewMatrix(check));
+        renderer.showProbe = true;
+        renderer.view(vp, check.position, width, height, {}, 3);
+        renderer.showProbe = false;
+        save("probe_check", 0);
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Preview: " << e.what() << '\n';

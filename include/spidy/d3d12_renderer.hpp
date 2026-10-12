@@ -1,5 +1,6 @@
 #pragma once
 #include "math.hpp"
+#include "overlay_geometry.hpp"
 #include "vertex.hpp"
 #include <array>
 #include <cstdint>
@@ -128,7 +129,4 @@ class D3D12Renderer {
     D3D12_RESOURCE_STATES gradeCopyState_ = D3D12_RESOURCE_STATE_COPY_DEST;
     DXGI_FORMAT gradeViewFormat_ = DXGI_FORMAT_UNKNOWN;
 };
-void addBox(std::vector<Vertex>& out, Vec3 min, Vec3 max, Vec3 color);
-void addBeam(std::vector<Vertex>& out, Vec3 a, Vec3 b, float radius, Vec3 color);
-void addTrackedHand(std::vector<Vertex>& out, Pose grip, unsigned hand, float squeeze, bool webGesture);
 } // namespace spidy

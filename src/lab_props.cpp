@@ -7,7 +7,8 @@ namespace {
 constexpr float knockSpeed = 4;     // an impact this fast knocks a standing thug over
 constexpr float restSeconds = 2.5f; // lying still this long before getting up
 constexpr float riseSeconds = .8f;
-LabProp object(std::uint64_t id, Vec3 base, Vec3 half, float mass, float radius, Vec3 color) {
+} // namespace
+LabProp labObject(std::uint64_t id, Vec3 base, Vec3 half, float mass, float radius, Vec3 color) {
     LabProp p;
     p.id = id;
     p.kind = TargetKind::Object;
@@ -18,8 +19,7 @@ LabProp object(std::uint64_t id, Vec3 base, Vec3 half, float mass, float radius,
     p.radius = radius;
     return p;
 }
-// A thug standing on `feet`, facing along yaw (radians from -Z, like the rig).
-LabProp thug(std::uint64_t id, Vec3 feet, float yaw, Vec3 jacket) {
+LabProp labThug(std::uint64_t id, Vec3 feet, float yaw, Vec3 jacket) {
     LabProp p;
     p.id = id;
     p.kind = TargetKind::Character;
@@ -30,6 +30,7 @@ LabProp thug(std::uint64_t id, Vec3 feet, float yaw, Vec3 jacket) {
     p.orientation = Quat::yaw(yaw);
     return p;
 }
+namespace {
 Quat normalizedQuat(Quat q) {
     const float n = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
     return n > 1e-6f ? Quat{q.x / n, q.y / n, q.z / n, q.w / n} : Quat{};
@@ -65,21 +66,21 @@ LabProps::LabProps() {
     const Vec3 crate{.3f, .3f, .3f}, barrel{.3f, .4f, .3f};
     std::uint64_t objects = 1001, people = 2001;
     // The launch rooftop (top at 18 m): within reach of the start.
-    initial_.push_back(object(objects++, {-2.2f, 18, 15.5f}, crate, 25, .32f, wood));
-    initial_.push_back(object(objects++, {2, 18, 14.5f}, crate, 25, .32f, wood));
-    initial_.push_back(object(objects++, {3.8f, 18, 17.5f}, barrel, 40, .4f, paint));
-    initial_.push_back(thug(people++, {-3.2f, 18, 13.2f}, 3.1416f, {.13f, .13f, .16f}));
-    initial_.push_back(thug(people++, {3.2f, 18, 12.8f}, 3.1416f, {.3f, .1f, .1f}));
+    initial_.push_back(labObject(objects++, {-2.2f, 18, 15.5f}, crate, 25, .32f, wood));
+    initial_.push_back(labObject(objects++, {2, 18, 14.5f}, crate, 25, .32f, wood));
+    initial_.push_back(labObject(objects++, {3.8f, 18, 17.5f}, barrel, 40, .4f, paint));
+    initial_.push_back(labThug(people++, {-3.2f, 18, 13.2f}, 3.1416f, {.13f, .13f, .16f}));
+    initial_.push_back(labThug(people++, {3.2f, 18, 12.8f}, 3.1416f, {.3f, .1f, .1f}));
     // The street below and ahead.
-    initial_.push_back(object(objects++, {-3, 0, 4}, crate, 25, .32f, wood));
-    initial_.push_back(object(objects++, {6, 0, -1}, crate, 25, .32f, wood));
-    initial_.push_back(object(objects++, {2, 0, -12}, crate, 25, .32f, wood));
-    initial_.push_back(object(objects++, {-8, 0, -6}, barrel, 40, .4f, paint));
-    initial_.push_back(object(objects++, {8, 0, -10}, barrel, 40, .4f, paint));
-    initial_.push_back(object(objects++, {-12, 0, -4}, {1, .6f, .55f}, 300, .6f, steel));
+    initial_.push_back(labObject(objects++, {-3, 0, 4}, crate, 25, .32f, wood));
+    initial_.push_back(labObject(objects++, {6, 0, -1}, crate, 25, .32f, wood));
+    initial_.push_back(labObject(objects++, {2, 0, -12}, crate, 25, .32f, wood));
+    initial_.push_back(labObject(objects++, {-8, 0, -6}, barrel, 40, .4f, paint));
+    initial_.push_back(labObject(objects++, {8, 0, -10}, barrel, 40, .4f, paint));
+    initial_.push_back(labObject(objects++, {-12, 0, -4}, {1, .6f, .55f}, 300, .6f, steel));
     const Vec3 feet[] = {{-5, 0, 2}, {4, 0, -3}, {0, 0, -9}, {-7, 0, -15}, {6, 0, -18}};
     for (unsigned i = 0; i < std::size(feet); ++i)
-        initial_.push_back(thug(people++, feet[i], 3.1416f + .3f * static_cast<float>(i % 3) - .3f,
+        initial_.push_back(labThug(people++, feet[i], 3.1416f + .3f * static_cast<float>(i % 3) - .3f,
                                 i % 2 ? Vec3{.13f, .13f, .16f} : Vec3{.3f, .1f, .1f}));
     props_ = initial_;
 }

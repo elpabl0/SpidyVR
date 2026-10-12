@@ -6,3 +6,10 @@
 *.user
 __pycache__/
 /dist/
+# The Quest lab: fetched photos and sky (quest/tools/fetch_assets.py), Gradle's output.
+/quest/app/src/main/assets/city/
+/quest/.gradle/
+/quest/build/
+/quest/app/build/
+/quest/app/.cxx/
+/quest/local.properties

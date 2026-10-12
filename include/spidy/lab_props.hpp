@@ -20,6 +20,11 @@ struct LabProp {
     bool grounded{};
     Vec3 lying{}; // where a rising character got up from
 };
+// An object (crate, barrel...) resting on `base`, drawn as a box of half
+// extents `half`; and a thug standing on `feet`, facing along yaw (radians
+// from -Z, like the rig), in a jacket of that colour.
+LabProp labObject(std::uint64_t id, Vec3 base, Vec3 half, float mass, float radius, Vec3 color);
+LabProp labThug(std::uint64_t id, Vec3 feet, float yaw, Vec3 jacket);
 class LabProps final : public TargetQueries {
   public:
     // A thug's centre stands this high above its feet.

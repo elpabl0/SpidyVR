@@ -1,0 +1,66 @@
+# Builds the Quest city lab's APK on a clean Linux machine, with the city's tests and a few rendered
+# views of it, so the APK can be side-loaded without Android Studio: Actions > Quest city lab >
+# Run workflow, then the run's Artifacts. quest/README.md says how to install it.
+name: Quest city lab
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'quest/**'
+      - 'src/city*.cpp'
+      - 'src/overlay_geometry.cpp'
+      - 'src/lab_*.cpp'
+      - 'src/stb_image_impl.cpp'
+      - 'include/spidy/city*.hpp'
+      - 'include/spidy/lab_*.hpp'
+      - 'apps/city_preview.cpp'
+      - 'tests/city_tests.cpp'
+      - 'CMakeLists.txt'
+      - '.github/workflows/quest.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Fetch the city's textures, sky and stb_image (pinned, CC0)
+        run: python3 quest/tools/fetch_assets.py
+      - name: Core and city tests
+        run: |
+          cmake -S . -B build/linux -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/linux -j4
+          ctest --test-dir build/linux --output-on-failure
+      - name: Android SDK packages
+        run: |
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdk" --licenses > /dev/null
+          "$sdk" "platforms;android-34" "build-tools;34.0.0" "ndk;27.2.12479018" "cmake;3.31.4" > /dev/null
+      - name: Build the APK
+        working-directory: quest
+        run: ./gradlew assembleRelease --console=plain
+      - uses: actions/upload-artifact@v7
+        with:
+          name: spidy-city-lab-apk
+          path: quest/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+      - name: Render the city without a headset
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri
+          cmake -S . -B build/preview -DCMAKE_BUILD_TYPE=Release -DSPIDY_BUILD_CITY_PREVIEW=ON
+          cmake --build build/preview -j4 --target spidy_city_preview
+          mkdir -p build/shots
+          ./build/preview/spidy_city_preview quest/app/src/main/assets build/shots 1280 720
+      - uses: actions/upload-artifact@v7
+        with:
+          name: city-preview
+          path: build/shots/*.ppm

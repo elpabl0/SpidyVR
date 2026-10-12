@@ -1,0 +1,158 @@
+{
+  "_comment": "Pinned CC0 assets for the Quest city lab; quest/tools/fetch_assets.py downloads and checks them. Sources and licences: quest/ASSETS.md.",
+  "materials": [
+    {
+      "id": "Facade018A",
+      "files": {
+        "Color": "d90217ca8d856321776cde57e717dab502338715b885267986dc830a9fd1a8b6",
+        "NormalGL": "c21c80bc0cb6acae35a1e4cedbcdc962237075bf684d0b37a398d5638f0bd907",
+        "Roughness": "3748ddbe959121d8eecac4c3299cb7a8548cb86ea4fc0f1f397626d3414ecb0f",
+        "Metalness": "1626d6a896e152843e22cba1a9759bf185701d9baafe5164489137eac5c02b6f"
+      }
+    },
+    {
+      "id": "Facade019A",
+      "files": {
+        "Color": "e61e0e892037ae18b8ec5fbf4da9d8a5990bce9c1b8914bc02aaaf3bcca66196",
+        "NormalGL": "7f975bddf88d8c206f3a8fcabf4c7f2dec85e381173a307479e7fd59b6bafa1d",
+        "Roughness": "35e0062d318631e9a5e126cb180e1374af1685fdce9e432b52259bf0c77419ef",
+        "Metalness": "0091611846518ed52cbd6194fd5a4399449a62adadfd63ca7c04a8500c2d4244"
+      }
+    },
+    {
+      "id": "Facade020A",
+      "files": {
+        "Color": "e572ce3b4ac9d3c79e884bd7b73f7d2ef067fbfb61883ed905c8bb192831a96c",
+        "NormalGL": "f5df2cca03e4017735353790e708df7c2bcdd9cc57a8716f6d7cc379da1ff760",
+        "Roughness": "9df94ebf1cdfe082e7a4e1ce73f1060a362acb7511fdad64f090639b39117d36",
+        "Metalness": "d75d412858578be46085dc3cb6af88ede030e2eae063ef41691a6d1ba63f0fc1"
+      }
+    },
+    {
+      "id": "Facade006",
+      "files": {
+        "Color": "a170d5d73cd4977fefa276bb85d2a14147db0abe6022dd13afddb09f1abc3c00",
+        "NormalGL": "0bce7a368d6a6e590af3550762a9e088202744f3efe47fee1b15b4ef98fad0e3",
+        "Roughness": "d442198a13462a152b8c24efa70302df8297a91936d58ea6c8d50eb31c23e0ec",
+        "Metalness": "353b2d1cf8fc147ee983aa2d56c3f009e2c9f475beee49a16862e88e18dd5342"
+      }
+    },
+    {
+      "id": "Facade001",
+      "files": {
+        "Color": "4e0aca5797c390bba9efd80a589b9569a3efb5cd22cfbb2780fc6ef811181736",
+        "NormalGL": "1ac56b097fef1a042610914f3a319bdc28f93bd523b01239bccb746faf172000",
+        "Roughness": "1bc7ae78aec982f296b470a697d340494e6a9575832a42915a3043c0cc2de9dd",
+        "Metalness": "ca2fc33029ca9f0000969bde3e2160bd1506256e5ad29e907b99dba75f9b7796"
+      }
+    },
+    {
+      "id": "Facade005",
+      "files": {
+        "Color": "61c1baa1312034b3644377c0ae442020109e918b57de6421bea0f2edff312dc0",
+        "NormalGL": "3b37a4df21d17bc3ee1c1dc951f756f8f64d964c279999f07663ef9d70716b30",
+        "Roughness": "93f0533d65ba80b4ca4c3e6a99c5c56cff549e9638b38658858190fd126dfed4",
+        "Metalness": "90441b3ff58eec91374001ddf3bce61451c2921dfa8c9d4c6034b2ec27aed807"
+      }
+    },
+    {
+      "id": "Facade017",
+      "files": {
+        "Color": "112bcfd164d7f24eb49902732cdd58b2c163d59bec60a30d37cc710dae5ba6ea",
+        "NormalGL": "aee2d417f1cd1929be99c9464283b413f168b8968c89a9cd6bccc0d45fabcacd",
+        "Roughness": "5fb902e5272f58717699d9b0b0daf8908b5ffd80bc0e5c9e8200cc63ba994d19"
+      }
+    },
+    {
+      "id": "Bricks085",
+      "files": {
+        "Color": "d0c822cdb5c001e66d087eeced710c652391f69ecada3c19dc9e236c15095a46",
+        "NormalGL": "96a09057e96518eea5212b090fab7f983278f5bb429fae8fed4dc066d291995e",
+        "Roughness": "987c5c169d5880db2820fb649aa6e9d88697cf544fb138c730cb1617845840b6"
+      }
+    },
+    {
+      "id": "Bricks101",
+      "files": {
+        "Color": "41eb9155a0e4b141b79ec21c5797f10468324827d0d2bea0b28ed44f4240f203",
+        "NormalGL": "62f8cf740defa41a896bcaf61272d934e6abdf384b7fd7c666b824aa8c60e3ff",
+        "Roughness": "b243da58426b19ed82b250e3172f9506b2ece726d09ea447924286611b661243"
+      }
+    },
+    {
+      "id": "Bricks094",
+      "files": {
+        "Color": "b5f7845f993bd991617497f8870f419afb861788f5b4a1e1413379ab28dff90e",
+        "NormalGL": "d6f5f9d999ad53d5be1ee500f573e17f723cb228f2d923298787364ea712615f",
+        "Roughness": "2bb8a8857a6667b54e0afaea961f1f7fc081c876bced161296408e0795e0f746"
+      }
+    },
+    {
+      "id": "Bricks066",
+      "files": {
+        "Color": "3a5b51dce8b672cbe022537d51c3cabf7af116d8e2e258e5da45b734fe02eca9",
+        "NormalGL": "2c6fede28d4f5a5fd6228b3114ad6363da766e154389e442573bed9e860c0e54",
+        "Roughness": "aba34eacf347961cb3a606f80a52260c5b978b27451df8df6d99a57f6787be50"
+      }
+    },
+    {
+      "id": "Concrete046",
+      "files": {
+        "Color": "2f155b85c2656305815e94a0efcc0b0087c141e52e98395cc03eb906252150af",
+        "NormalGL": "b7fb7d45f85bad9e1c61f544e90077735f8f787cd13d3c1161aece11082fe9ff",
+        "Roughness": "ee79cf1139197522ac6ed6dad2d9c0429626cd8f2e107aaaf9daa1f4f30e7d7d"
+      }
+    },
+    {
+      "id": "Asphalt020L",
+      "files": {
+        "Color": "ed8631d57c69f647b90f197ec0a5da4bd866eefbe29f347a2fa818d0ef8f7ad7",
+        "NormalGL": "1980fbec0abc7deaef16038b5d455a18e41bc2d7e19cc2d8f374c926a59d7b3e",
+        "Roughness": "7a82eef16e17edfccf69602c359995ca2ef95aff2afc2e0948d0ef369f97e748"
+      }
+    },
+    {
+      "id": "PavingStones136",
+      "files": {
+        "Color": "5291854f8a7fcf554f2e278e36426eee9de65dd71d93c7f837b2c3f80ca42cfa",
+        "NormalGL": "a302144995a7d7b638864a8f28ed1c8bf68d8c7b6c6e3daac6ad5b0bbf4bc9c0",
+        "Roughness": "37370086ad37d163f089646da366692e10515e7c94128fe7bac83daa64015267"
+      }
+    },
+    {
+      "id": "Gravel028",
+      "files": {
+        "Color": "703d3a095aa7d5499af26750478ed2f2f165dfdab68dafd541748977911513c3",
+        "NormalGL": "5659dfcb23dd509d86a9db59961d11f6e533cf2f93913a61c17d2c23da9c9291",
+        "Roughness": "cc3ac1a33e23a5ad08b812fa78cf39d544718991ec903ea276e9328b9b080ea9"
+      }
+    },
+    {
+      "id": "CorrugatedSteel009",
+      "files": {
+        "Color": "d873459d9752377688fd14e0e4f4b813fc787e66880ce7d06ada07831be048f0",
+        "NormalGL": "0682a09b02db4bd964e0297126355e7d95ebfeb31aa9c8e9835297cdc46d396a",
+        "Roughness": "9af07f183450a11dc59bf2cb71e91e84f8a60e866724a54e6b86f8f2fdcebbae",
+        "Metalness": "f6e180c91aac80365c74fa58e47caef4622690307bf439cfc8243fc618b885ad"
+      }
+    },
+    {
+      "id": "WoodSiding008",
+      "files": {
+        "Color": "f1c21920bec1104bfd93aa30858d5a3cea8e67147741403790f1ef69a88bde66",
+        "NormalGL": "8ce1c7ef8cf8e7c6f8b1c5621b668f957f389e053b6bf6a94b5f315d0125e44d",
+        "Roughness": "04ea168420ff533b7be6cb69d13a3c2bb350472c75e6a555e7623cf2e38be30b",
+        "Metalness": "646e926af1ecd430908da936dc919c0f1b21c6f7ed566fd781e3f6d8737e9991"
+      }
+    }
+  ],
+  "sky": {
+    "id": "kloofendal_48d_partly_cloudy_puresky",
+    "url": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/2k/kloofendal_48d_partly_cloudy_puresky_2k.hdr",
+    "sha256": "5244534e9cf5b606f2ff513aa00ddb161b0a4826ffd88a0d3bd03ac29247d198"
+  },
+  "stb_image": {
+    "revision": "2c980bb59875b0d32144a71867fbdebb2f77cd20",
+    "sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3"
+  }
+}

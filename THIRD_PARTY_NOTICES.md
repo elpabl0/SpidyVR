@@ -34,6 +34,14 @@ in `python\`; one line (`..\tools`) is added to `python312._pth` so it finds the
 tools. Python is Copyright the Python Software Foundation and distributed under
 the PSF License Agreement; its complete license is `python\LICENSE.txt`.
 
+The Quest city lab (`quest/`) links the unmodified Khronos OpenXR loader for
+Android 1.1.49 (`org.khronos.openxr:openxr_loader_for_android` on Maven Central;
+Apache License 2.0, as above) and decodes its images with unmodified
+`stb_image.h` by Sean Barrett (public domain / MIT), revision
+`2c980bb59875b0d32144a71867fbdebb2f77cd20`. Its photo materials (ambientCG) and
+sky (Poly Haven) are CC0. `quest/tools/fetch_assets.py` fetches them pinned by
+hash; `quest/ASSETS.md` lists each with its source.
+
 The Blade & Sorcery mod is a mechanics reference. Its files are not bundled or
 linked. The ArkWeb research checkout is likewise not bundled or linked. See
 `docs/REFERENCE.md` for attribution and independently checked address facts.

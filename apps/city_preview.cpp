@@ -3,6 +3,7 @@
 // picture of each (binary PPM). For checking the city's look on a desktop or
 // in CI:  spidy_city_preview <assets dir> <out dir> [width height]
 #include "spidy/city_renderer.hpp"
+#include "spidy/lab_menu.hpp"
 #include "spidy/overlay_geometry.hpp"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -141,6 +142,30 @@ int main(int argc, char** argv) {
                     std::string(label) + "_" + shot.name,
                     std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
             }
+        }
+        // The pause menu over the roof at sunset, the right hand pointing at a row.
+        {
+            renderer.timeOfDay(TimeOfDay::Sunset);
+            const Pose head = lookAt(roof, roof + Vec3{0, 0, -10});
+            LabMenu menu;
+            menu.show(head);
+            vr_settings::Values values;
+            int time = 1;
+            LabMenu::Input in;
+            const Vec3 hand = head.position + Vec3{.22f, -.45f, -.3f};
+            const Vec3 target = menu.rowPoint(9);
+            in.aims[1] = {hand, arc({0, 0, -1}, normalized(target - hand))};
+            in.aimValid[1] = true;
+            in.seconds = 1.f / 72;
+            menu.update(in, values, time);
+            std::vector<Vertex> ui;
+            menu.draw(ui, values, time);
+            renderer.shadows(head.position);
+            renderer.reflections(head.position, 6);
+            glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+            const Mat4 vp = multiply(glProjection(wide), viewMatrix(head));
+            renderer.view(vp, head.position, width, height, overlay, 3, ui);
+            save("menu", 0);
         }
         // The reflection probe drawn as the sky from the last view's place:
         // it should match that view (a wrong cube face shows here).

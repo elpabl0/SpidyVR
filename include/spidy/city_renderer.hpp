@@ -50,8 +50,9 @@ class Renderer {
     void reflections(Vec3 at, unsigned faces = 1);
     // One view into the bound framebuffer (cleared here) at width x height.
     // overlay: lit-by-hand geometry, an alpha below 1 blended over the rest.
+    // ui: drawn last, over everything and in its own order (a menu).
     void view(const Mat4& viewProjection, Vec3 eye, unsigned width, unsigned height,
-              std::span<const Vertex> overlay, float seconds);
+              std::span<const Vertex> overlay, float seconds, std::span<const Vertex> ui = {});
     // The reflection probe drawn as the sky, to check it against a view.
     bool showProbe = false;
     Vec3 sunDirection() const {
@@ -76,6 +77,7 @@ class Renderer {
     void cityUniforms(const Mat4& viewProjection, Vec3 eye, float seconds, bool capture);
     void drawCity(const Mat4& viewProjection, bool shadowPass);
     void drawSky(const Mat4& viewProjection, Vec3 eye, bool capture);
+    void stream(std::span<const Vertex> vertices);
     unsigned cityProgram_{}, shadowProgram_{}, skyProgram_{}, overlayProgram_{};
     unsigned cityArray_{}, cityBuffer_{}, cityIndices_{};
     unsigned overlayArray_{}, overlayBuffer_{};

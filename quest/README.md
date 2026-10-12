@@ -145,24 +145,29 @@ adb logcat -s SpidyCity
 | Turn | **Right stick**: 30-degree snap turns (`snap_turn`), or hold to turn smoothly (`smooth_turn`) |
 | Back to the launch roof | **Y** (also when you fall in the river) |
 | Day, sunset, night | **X** |
+| Settings (pauses the lab) | **Menu** button (left controller) |
 
 The coloured cube at the end of each hand's aim is where its web would stick.
 
 ### Settings
 
-Until the lab has its own menu, its settings (the same as the game's SPIDY VR
-tab) are in a text file on the headset. The app writes it with the defaults
-the first time it starts:
+The **menu** button opens the lab's settings in front of you and pauses
+everything behind it: the game's SPIDY VR settings that the lab has (web
+button, aim markers, webs in open air, swing speed, weight, physical webs,
+snap and smooth turn, vibration, stand on walls, flips and flip speed), the
+time of day, and a way back to the launch roof.
 
-```sh
-adb pull /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
-# edit it, e.g. smooth_turn = 120, web_button = trigger, flips = on
-adb push settings.txt /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
-```
+- Point either controller at a row and pull its **trigger** for the next
+  choice; at the row's **<**, the one before. The help for the row you point
+  at shows below.
+- Or the **thumbsticks**: up and down choose a row, left and right its choice;
+  **A** the next choice.
+- **B**, the menu button, or **CLOSE** closes it.
 
-Then restart the app. It has `snap_turn`, `smooth_turn`, `web_button`,
-`flips`, `flip_speed`, `stand_on_walls`, `swing_speed`, `weight`, `air_webs`,
-`physical_webs` and `haptics`; `adb logcat -s SpidyCity` shows what it read.
+Changes apply at once and are kept in `settings.txt` in the app's files on
+the headset, which you can also edit with `adb pull` / `adb push`
+(`/sdcard/Android/data/io.github.spidy.citylab/files/settings.txt`), then
+restart the app.
 
 ## Performance
 
@@ -194,6 +199,8 @@ and the frame rate on the headset are untested. Reports welcome.
   the game's tracking rig (turning, flips, the web button, standing on walls)
   and charged leap on the lab's own swing; `spidy_lab_motion_tests` plays each
   in the city.
+- `src/lab_menu.cpp` (`include/spidy/lab_menu.hpp`): the pause menu, drawn in
+  Spidy's stroke font; `spidy_lab_menu_tests` points and clicks through it.
 - `quest/app/src/main/cpp/`: the app: `quest_xr.cpp` (EGL, OpenXR session,
   input, swapchains), `quest_main.cpp` (the lab on the city, its settings file).
 - `apps/city_preview.cpp`: renders a few views without a window (Linux, EGL):

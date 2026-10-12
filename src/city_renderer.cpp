@@ -366,7 +366,7 @@ in float vAlpha;
 in vec3 vPosition;
 out vec4 outColor;
 void main() {
-    if ((uTranslucent == 1) != (vAlpha < 0.999))
+    if (uTranslucent < 2 && (uTranslucent == 1) != (vAlpha < 0.999))
         discard;
     const float scale = 140.0;
     float y0 = max(uEye.y, 0.0), y1 = max(vPosition.y, 0.0), dy = y1 - y0;
@@ -1072,8 +1072,19 @@ void Renderer::reflections(Vec3 at, unsigned faces) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
+void Renderer::stream(std::span<const Vertex> vertices) {
+    glBindVertexArray(overlayArray_);
+    glBindBuffer(GL_ARRAY_BUFFER, overlayBuffer_);
+    const std::size_t bytes = vertices.size() * sizeof(Vertex);
+    if (bytes > overlayCapacity_) {
+        overlayCapacity_ = bytes * 2;
+        glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(overlayCapacity_), nullptr, GL_STREAM_DRAW);
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(bytes), vertices.data());
+}
+
 void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
-                    std::span<const Vertex> overlay, float seconds) {
+                    std::span<const Vertex> overlay, float seconds, std::span<const Vertex> ui) {
     glViewport(0, 0, static_cast<GLsizei>(width), static_cast<GLsizei>(height));
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LEQUAL);
@@ -1090,14 +1101,7 @@ void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
     }
     // The lab's own geometry: solid, then see-through over it.
     if (!overlay.empty() && !showProbe) {
-        glBindVertexArray(overlayArray_);
-        glBindBuffer(GL_ARRAY_BUFFER, overlayBuffer_);
-        const std::size_t bytes = overlay.size() * sizeof(Vertex);
-        if (bytes > overlayCapacity_) {
-            overlayCapacity_ = bytes * 2;
-            glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(overlayCapacity_), nullptr, GL_STREAM_DRAW);
-        }
-        glBufferSubData(GL_ARRAY_BUFFER, 0, static_cast<GLsizeiptr>(bytes), overlay.data());
+        stream(overlay);
         glUseProgram(overlayProgram_);
         matrix(overlayProgram_, "uViewProjection", vp);
         vec3(overlayProgram_, "uEye", eye);
@@ -1119,5 +1123,22 @@ void Renderer::view(const Mat4& vp, Vec3 eye, unsigned width, unsigned height,
     }
     // The sky last, only where nothing else drew.
     drawSky(vp, eye, false);
+    // A menu over it all, in the order it was built, without haze.
+    if (!ui.empty()) {
+        stream(ui);
+        glUseProgram(overlayProgram_);
+        matrix(overlayProgram_, "uViewProjection", vp);
+        vec3(overlayProgram_, "uEye", eye);
+        glUniform1f(uniform(overlayProgram_, "uFogDensity"), 0);
+        glUniform1i(uniform(overlayProgram_, "uTranslucent"), 2);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(ui.size()));
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glBindVertexArray(0);
+    }
 }
 } // namespace spidy::city

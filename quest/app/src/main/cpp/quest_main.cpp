@@ -4,6 +4,7 @@
 #include "quest_xr.hpp"
 #include "spidy/city.hpp"
 #include "spidy/city_renderer.hpp"
+#include "spidy/lab_menu.hpp"
 #include "spidy/lab_motion.hpp"
 #include "spidy/lab_props.hpp"
 #include "spidy/overlay_geometry.hpp"
@@ -46,29 +47,38 @@ city::ReadAsset assets(AAssetManager* manager) {
 // app's files on the headset (Android/data/io.github.spidy.citylab/files),
 // one "name = value" a line; written with the defaults when missing. Until
 // the lab has its own menu.
-constexpr const char* settingsHelp = R"(# Spidy City Lab settings: edit, then restart the app.
+constexpr const char* settingsHelp =
+    R"(# Spidy City Lab settings: the pause menu (the menu button) changes them;
+# or edit this file, then restart the app.
 # adb pull /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
 # adb push settings.txt /sdcard/Android/data/io.github.spidy.citylab/files/settings.txt
 )";
+void saveSettings(const std::string& path, const vr_settings::Values& v) {
+    const auto onOff = [](bool on) { return on ? "on" : "off"; };
+    std::ofstream out(path);
+    out << settingsHelp;
+    out << "snap_turn = " << v.snapTurn << "      # degrees a flick of the right stick; 0: none\n";
+    out << "smooth_turn = " << v.smoothTurn << "     # degrees a second the right stick turns you; 0: snap\n";
+    out << "web_button = " << (v.triggerWebs ? "trigger" : "grip")
+        << "   # which one shoots and holds webs\n";
+    out << "aim_markers = " << onOff(v.aimMarkers) << "   # where each free hand's web would stick\n";
+    out << "flips = " << onOff(v.flips)
+        << "         # the left stick and A in the air flip you (experimental)\n";
+    out << "flip_speed = " << v.flipSpeed << "    # degrees a second at full tilt\n";
+    out << "stand_on_walls = " << onOff(v.standOnWalls)
+        << " # on a wall, your view turns so the wall is your floor\n";
+    out << "swing_speed = " << static_cast<int>(v.swingSpeed) << "    # the fastest a web flies you, m/s\n";
+    out << "weight = " << v.weight << "        # percent of real gravity while you fly\n";
+    out << "air_webs = " << onOff(v.airWebs)
+        << "      # a web that meets nothing in reach holds in open air\n";
+    out << "physical_webs = " << onOff(v.physicalWebs) << " # webs bend round edges like ropes\n";
+    out << "haptics = " << v.haptics << "       # vibration, percent\n";
+}
 vr_settings::Values loadSettings(const std::string& path) {
     vr_settings::Values v;
     std::ifstream in(path);
     if (!in) {
-        std::ofstream out(path);
-        out << settingsHelp << "snap_turn = " << v.snapTurn
-            << "        # degrees a flick of the right stick; 0: none\n"
-            << "smooth_turn = " << v.smoothTurn
-            << "       # degrees a second the right stick turns you; 0: snap\n"
-            << "web_button = grip     # grip or trigger: which one shoots and holds webs\n"
-            << "flips = off           # on: the left stick and A in the air flip you (experimental)\n"
-            << "flip_speed = " << v.flipSpeed << "      # degrees a second at full tilt\n"
-            << "stand_on_walls = on   # on: on a wall, your view turns so the wall is your floor\n"
-            << "swing_speed = " << static_cast<int>(v.swingSpeed)
-            << "      # the fastest a web flies you, m/s\n"
-            << "weight = " << v.weight << "          # percent of real gravity while you fly\n"
-            << "air_webs = on         # on: a web that meets nothing in reach holds in open air\n"
-            << "physical_webs = on    # on: webs bend round edges like ropes\n"
-            << "haptics = " << v.haptics << "         # vibration, percent\n";
+        saveSettings(path, v);
         quest::log("Settings: wrote the defaults to " + path);
         return v;
     }
@@ -89,6 +99,8 @@ vr_settings::Values loadSettings(const std::string& path) {
             v.smoothTurn = number;
         else if (key == "web_button")
             v.triggerWebs = on;
+        else if (key == "aim_markers")
+            v.aimMarkers = on;
         else if (key == "flips")
             v.flips = on;
         else if (key == "flip_speed")
@@ -163,13 +175,23 @@ void run(android_app* app, AppState& state) {
     WebGrab grab;
     LabMotion motion;
     const std::string files = app->activity->externalDataPath ? app->activity->externalDataPath : "";
-    const auto settings = loadSettings(files + "/settings.txt");
-    motion.configure(settings);
-    swing.limitSpeed(settings.swingSpeed);
-    swing.setGravity(vr_settings::gravity(settings.weight));
-    swing.allowAirAnchors(settings.airWebs);
-    swing.allowPhysical(settings.physicalWebs);
-    const float vibration = static_cast<float>(settings.haptics) / 100;
+    const std::string settingsPath = files + "/settings.txt";
+    auto settings = loadSettings(settingsPath);
+    float vibration = 1;
+    const auto apply = [&] {
+        motion.configure(settings);
+        swing.limitSpeed(settings.swingSpeed);
+        swing.setGravity(vr_settings::gravity(settings.weight));
+        swing.allowAirAnchors(settings.airWebs);
+        swing.allowPhysical(settings.physicalWebs);
+        vibration = static_cast<float>(settings.haptics) / 100;
+    };
+    apply();
+    LabMenu menu;
+    std::vector<Vertex> ui;
+    bool menuHeld = false, settingsChanged = false;
+    bool heldFromMenu[3]{}; // each hand's trigger and grip, and A
+    int time = 0;
     const auto buzz = [&](int hand, float strength, float seconds = .025f) {
         if (vibration > 0)
             xr.haptic(hand, strength * vibration, seconds);
@@ -193,7 +215,7 @@ void run(android_app* app, AppState& state) {
     quest::log(
         "Squeeze a grip: web and swing. Trigger: reel. Pull sharply: zip. A: jump; hold it on the ground to "
         "leap. Walk or fly into a wall to run along it and climb it. Y: back to the roof. X: day, sunset, "
-        "night.");
+        "night. Menu button: settings.");
     while (!app->destroyRequested) {
         // Android's events: wait for them while no frames run (paused, or
         // the runtime not ready yet); between frames, only take what is there.
@@ -217,21 +239,97 @@ void run(android_app* app, AppState& state) {
         xr.frame(
             [&](const XrFrame& f) {
                 clock += f.seconds;
+                // The menu button: the pause menu, and the lab waits behind it.
+                const bool menuButton = (f.buttons & buttonMenu) != 0;
+                if (f.focused && f.valid && menuButton && !menuHeld && !menu.open()) {
+                    menu.show(motion.toWorld(f.head));
+                    buzz(0, .3f);
+                }
+                menuHeld = menuButton;
+                ui.clear();
+                if (menu.open()) {
+                    LabMenu::Input in;
+                    for (int i = 0; i < 2; ++i) {
+                        in.aimValid[i] = f.focused && f.hands[i].valid;
+                        in.aims[i] = motion.toWorld(f.hands[i].aim);
+                        in.triggers[i] = f.hands[i].trigger;
+                        if (std::hypot(f.hands[i].stickX, f.hands[i].stickY) >
+                            std::hypot(in.stickX, in.stickY)) {
+                            in.stickX = f.hands[i].stickX;
+                            in.stickY = f.hands[i].stickY;
+                        }
+                    }
+                    in.a = f.jump;
+                    in.b = (f.buttons & buttonB) != 0;
+                    in.menu = menuButton;
+                    in.seconds = f.seconds;
+                    switch (menu.update(in, settings, time)) {
+                    case LabMenu::Action::changed:
+                        apply();
+                        settingsChanged = true;
+                        buzz(1, .25f);
+                        break;
+                    case LabMenu::Action::timeOfDay:
+                        renderer.timeOfDay(static_cast<city::TimeOfDay>(time));
+                        buzz(1, .25f);
+                        break;
+                    case LabMenu::Action::launchRoof:
+                        reset();
+                        menu.close();
+                        break;
+                    default:
+                        break;
+                    }
+                    if (menu.hoverHand() >= 0)
+                        buzz(menu.hoverHand(), .12f, .01f);
+                    if (!menu.open() && settingsChanged) {
+                        saveSettings(settingsPath, settings);
+                        settingsChanged = false;
+                        quest::log("Settings: saved");
+                    }
+                    menu.draw(ui, settings, time);
+                    // The lab waits: crates, thugs and hands drawn where they are.
+                    geometry.clear();
+                    for (const auto& p : props.props())
+                        addProp(geometry, p);
+                    for (int i = 0; i < 2; ++i)
+                        if (f.hands[i].valid)
+                            addTrackedHand(geometry, motion.toWorld(f.hands[i].grip),
+                                           static_cast<unsigned>(i), f.hands[i].squeeze, false);
+                    if (f.valid)
+                        lastHead = motion.toWorld(f.head);
+                    renderer.shadows(lastHead.position);
+                    renderer.reflections(lastHead.position);
+                    heldFromMenu[0] = heldFromMenu[1] = heldFromMenu[2] = true;
+                    resetHeld = f.reset;
+                    timeHeld = (f.buttons & buttonX) != 0;
+                    return;
+                }
                 if (f.focused && f.valid && f.reset && !resetHeld)
                     reset();
                 resetHeld = f.reset;
                 // X: day, sunset, night.
                 const bool timeButton = (f.buttons & buttonX) != 0;
                 if (f.focused && timeButton && !timeHeld) {
-                    const auto next =
-                        static_cast<city::TimeOfDay>((static_cast<int>(renderer.timeOfDay()) + 1) % 3);
-                    renderer.timeOfDay(next);
+                    time = (time + 1) % 3;
+                    renderer.timeOfDay(static_cast<city::TimeOfDay>(time));
                     const char* names[] = {"day", "sunset", "night"};
-                    quest::log(std::string("Time of day: ") + names[static_cast<int>(next)]);
+                    quest::log(std::string("Time of day: ") + names[time]);
                 }
                 timeHeld = timeButton;
                 // Turning, flips, the web button, walls and the charged leap.
-                const auto moved = motion.update(f, swing, facing);
+                // Buttons still held from the menu do nothing until let go.
+                XrFrame played = f;
+                for (int i = 0; i < 2; ++i) {
+                    heldFromMenu[i] =
+                        heldFromMenu[i] && (f.hands[i].trigger > .1f || f.hands[i].squeeze > .1f);
+                    if (heldFromMenu[i])
+                        played.hands[i].trigger = played.hands[i].squeeze = 0;
+                }
+                heldFromMenu[2] = heldFromMenu[2] && f.jump;
+                if (heldFromMenu[2])
+                    played.jump = false;
+                const auto moved = motion.update(played, swing, facing);
                 if (moved.chargeBegan)
                     buzz(1, .3f);
                 else if (moved.charging) {
@@ -304,7 +402,9 @@ void run(android_app* app, AppState& state) {
                     } else {
                         const auto aim = motion.toWorld(f.hands[i].aim);
                         const Vec3 color = i ? Vec3{.2f, .65f, 1} : Vec3{1, .12f, .18f};
-                        if (const auto next = grab.preview(aim, world, props)) {
+                        if (!settings.aimMarkers) {
+                            // AIM MARKERS off: none.
+                        } else if (const auto next = grab.preview(aim, world, props)) {
                             const Vec3 top = next->position + Vec3{0, next->radius + .25f, 0};
                             addBox(geometry, top - Vec3{.06f, .06f, .06f}, top + Vec3{.06f, .06f, .06f},
                                    {1, .85f, .2f});
@@ -323,7 +423,7 @@ void run(android_app* app, AppState& state) {
             [&](unsigned, const Pose& eye, const EyeFov& fov, unsigned width, unsigned height) {
                 const Pose world = motion.toWorld(eye);
                 const Mat4 vp = multiply(city::glProjection(fov), viewMatrix(world));
-                renderer.view(vp, world.position, width, height, geometry, clock);
+                renderer.view(vp, world.position, width, height, geometry, clock, ui);
             });
     }
 }
